@@ -1,15 +1,17 @@
 from fastapi import FastAPI
-from app.core.config import settings
-from app.api.v1.api import api_router
+from app.core.conf import APP_NAME, APP_VERSION, DEBUG, API_V1_PREFIX
+from app.api.v1 import api_router
+from app.db.connection import Base, engine, get_db
 
 app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    debug=settings.DEBUG
+    title=APP_NAME,
+    version=APP_VERSION,
+    debug=DEBUG
 )
 
+Base.metadata.create_all(bind=engine)
 # Include API router
-app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+app.include_router(api_router, prefix=API_V1_PREFIX)
 
 @app.get("/")
 async def root():
