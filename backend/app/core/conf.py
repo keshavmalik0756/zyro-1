@@ -1,8 +1,13 @@
 import os
 from dotenv import load_dotenv
+from pathlib import Path
+
+# Get the directory where this file is located
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Load environment variables from .env.local
-load_dotenv(".env.local")
+env_path = BASE_DIR / ".env.local"
+load_dotenv(env_path)
 
 # App Settings
 APP_NAME = os.getenv("APP_NAME", "Zyro API")
@@ -25,3 +30,22 @@ DB_PORT = os.getenv("DB_PORT")
 
 # Database Settings
 DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
+
+# JWT Settings
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+# Handle JWT token expiration - convert to int, with defaults
+_jwt_access_expire = os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(_jwt_access_expire) if _jwt_access_expire.isdigit() else 30
+
+_jwt_refresh_expire = os.getenv("JWT_REFRESH_TOKEN_EXPIRE_MINUTES", "10080")  # Default: 7 days
+# Handle if it's a calculation like "60 * 24 * 7"
+if _jwt_refresh_expire.isdigit():
+    JWT_REFRESH_TOKEN_EXPIRE_MINUTES = int(_jwt_refresh_expire)
+else:
+    try:
+        # Try to evaluate if it's a simple expression
+        JWT_REFRESH_TOKEN_EXPIRE_MINUTES = eval(_jwt_refresh_expire) if '*' in _jwt_refresh_expire or '+' in _jwt_refresh_expire else 10080
+    except:
+        JWT_REFRESH_TOKEN_EXPIRE_MINUTES = 10080  # Default: 7 days

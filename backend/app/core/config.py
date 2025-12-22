@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # API Settings
     API_V1_PREFIX: str = "/api/v1"
     
+
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
