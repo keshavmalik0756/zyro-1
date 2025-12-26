@@ -23,58 +23,76 @@ const Navbar = () => {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 h-16 bg-gradient-to-r from-blue-50 to-emerald-50 border-b border-blue-200/30 px-4 md:px-6 flex items-center justify-between">
+    <header className="
+      sticky top-0 z-40
+      h-16
+      bg-white/80 backdrop-blur-md
+      border-b border-gray-200
+      px-4 md:px-6
+      flex items-center justify-between
+    ">
       {/* LEFT */}
-      <div className="flex items-center gap-4">
-        <button className="md:hidden p-2 rounded-lg hover:bg-blue-100 text-blue-600">
+      <div className="flex items-center gap-4 flex-1">
+        <button className="md:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600">
           <Menu size={20} />
         </button>
 
+        {/* Search */}
         {isMobileSearchOpen ? (
           <div className="relative flex-1 md:hidden">
             <Search
-              size={18}
+              size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
               type="text"
               placeholder="Search projects, tasks..."
-              className="bg-blue-100/50 border border-blue-200/50 rounded-lg pl-10 pr-10 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-400"
+              className="
+                w-full bg-gray-100 border border-gray-300
+                rounded-xl pl-10 pr-10 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-blue-500
+              "
               autoFocus
             />
-            <button 
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-blue-200 text-blue-600"
+            <button
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-200"
               onClick={() => setIsMobileSearchOpen(false)}
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
         ) : (
           <div className="relative hidden md:block">
             <Search
-              size={18}
+              size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
               type="text"
               placeholder="Search projects, tasks..."
-              className="bg-blue-100/50 border border-blue-200/50 rounded-lg pl-10 pr-4 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-400" />
+              className="
+                w-72 bg-gray-100 border border-gray-300
+                rounded-xl pl-10 pr-4 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-blue-500
+              "
+            />
           </div>
         )}
       </div>
 
       {/* RIGHT */}
-      <div className="flex items-center gap-4 md:gap-6">
+      <div className="flex items-center gap-4">
         {!isMobileSearchOpen && (
-          <button 
-            className="md:hidden p-2 rounded-lg hover:bg-blue-100 text-blue-600"
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600"
             onClick={() => setIsMobileSearchOpen(true)}
           >
             <Search size={20} />
           </button>
         )}
 
-        <button className="relative p-2 rounded-lg hover:bg-blue-100 text-blue-600">
+        {/* Notifications */}
+        <button className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-600">
           <Bell size={20} />
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
         </button>
@@ -83,18 +101,28 @@ const Navbar = () => {
         <div className="relative">
           <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-3 px-2 py-1 rounded-lg hover:bg-blue-100/50 transition"
+            className="
+              flex items-center gap-3 px-3 py-2
+              rounded-xl hover:bg-gray-100 transition
+            "
           >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-green-500 flex items-center justify-center text-white font-semibold">
+            <div className="
+              w-9 h-9 rounded-full
+              bg-gradient-to-br from-green-500 to-emerald-600
+              flex items-center justify-center
+              text-white font-semibold
+            ">
               {user?.name?.charAt(0).toUpperCase() || "U"}
             </div>
 
             <div className="hidden md:block text-left">
-              <p className="text-sm font-medium text-gray-800">
+              <p className="text-sm font-semibold text-gray-800 leading-tight">
                 {user?.name || "User"}
               </p>
               <p className="text-xs text-gray-500">
-                {user?.role || "Member"}
+                {user?.role
+                  ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                  : "Member"}
               </p>
             </div>
 
@@ -102,10 +130,14 @@ const Navbar = () => {
           </button>
 
           {isProfileOpen && (
-            <div className="absolute right-0 mt-3 w-52 bg-white/90 backdrop-blur-sm border border-emerald-200/50 rounded-xl shadow-lg overflow-hidden">
+            <div className="
+              absolute right-0 mt-3 w-56
+              bg-white border border-gray-200
+              rounded-xl shadow-xl overflow-hidden
+            ">
               <button
                 onClick={() => navigate("/profile")}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-emerald-100/50 text-emerald-700"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-100"
               >
                 <User size={16} />
                 Profile
@@ -113,7 +145,7 @@ const Navbar = () => {
 
               <button
                 onClick={() => navigate("/settings")}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-emerald-100/50 text-emerald-700"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-100"
               >
                 <Settings size={16} />
                 Settings
@@ -126,7 +158,7 @@ const Navbar = () => {
                   dispatch(logout());
                   navigate("/login");
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-100"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-gray-100"
               >
                 <LogOut size={16} />
                 Logout

@@ -94,7 +94,18 @@ const Login: React.FC = () => {
             
             if (loginUser.fulfilled.match(result)) {
                 toast.success("Login successful!");
-                navigate("/home");
+                
+                // Redirect based on user role
+                const userRole = result.payload.user_data?.role;
+                
+                if (userRole === 'manager' || userRole === 'admin') {
+                    navigate("/manager");
+                } else if (userRole === 'employee') {
+                    navigate("/employee");
+                } else {
+                    // Default redirect for other roles
+                    navigate("/home");
+                }
             } else {
                 // Handle error
                 const errorMessage = result.payload || "Login failed. Please try again.";

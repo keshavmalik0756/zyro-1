@@ -1,95 +1,74 @@
-// Using mock data instead of actual API calls
+import axios from 'axios';
+import { ApiResponse } from './types';
 
-// Mock data for issues
-const mockIssues = [
-  {
-    id: 1,
-    name: "Fix Login Page Error",
-    status: "in_progress",
-    priority: "high",
-    description: "Users are unable to login with valid credentials. Error occurs after password validation.",
-    type: "bug",
-    sprint_id: 1,
-    assigned_to: 1,
-    assigned_by: 2,
-    created_at: "2023-02-20T10:30:00Z",
-    updated_at: "2023-02-21T14:45:00Z"
+// Create axios instance
+const apiClient = axios.create({
+  withCredentials: true,
+});
+
+/* ======================================================
+   🔹 Request Interceptor (Auth)
+====================================================== */
+apiClient.interceptors.request.use(
+  (config) => {
+    // Get token from the auth state stored in localStorage
+    const authStateStr = localStorage.getItem('authState');
+    let token = null;
+    
+    if (authStateStr) {
+      try {
+        const authState = JSON.parse(authStateStr);
+        token = authState.token;
+      } catch (e) {
+        console.error('Error parsing auth state:', e);
+      }
+    }
+    
+    // Fallback to direct access_token if authState doesn't contain token
+    if (!token) {
+      token = localStorage.getItem('access_token');
+    }
+    
+    if (token) {
+      if (!config.headers) {
+        config.headers = {};
+      }
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Set the base API URL dynamically
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+    config.baseURL = API_BASE_URL;
+    
+    return config;
   },
-  {
-    id: 2,
-    name: "Add Dark Mode Feature",
-    status: "todo",
-    priority: "medium",
-    description: "Implement dark mode toggle in user preferences section.",
-    type: "feature",
-    sprint_id: 2,
-    assigned_to: null,
-    assigned_by: 2,
-    created_at: "2023-02-19T09:15:00Z",
-    updated_at: "2023-02-19T09:15:00Z"
-  },
-  {
-    id: 3,
-    name: "Update Documentation",
-    status: "completed",
-    priority: "low",
-    description: "Update API documentation with new endpoints and parameters.",
-    type: "task",
-    sprint_id: 1,
-    assigned_to: 3,
-    assigned_by: 2,
-    created_at: "2023-02-18T13:20:00Z",
-    updated_at: "2023-02-20T16:00:00Z"
-  },
-  {
-    id: 4,
-    name: "Database Performance Issue",
-    status: "hold",
-    priority: "high",
-    description: "Slow query response times affecting user experience. Requires investigation.",
-    type: "bug",
-    sprint_id: 3,
-    assigned_to: 4,
-    assigned_by: 2,
-    created_at: "2023-02-17T14:30:00Z",
-    updated_at: "2023-02-19T10:15:00Z"
-  },
-  {
-    id: 5,
-    name: "Mobile Responsive Issues",
-    status: "in_progress",
-    priority: "medium",
-    description: "Layout breaks on mobile devices below 768px width.",
-    type: "bug",
-    sprint_id: 2,
-    assigned_to: 5,
-    assigned_by: 2,
-    created_at: "2023-02-21T08:45:00Z",
-    updated_at: "2023-02-22T11:30:00Z"
-  },
-  {
-    id: 6,
-    name: "Implement Payment Gateway",
-    status: "todo",
-    priority: "high",
-    description: "Integrate Stripe payment processing for subscription plans.",
-    type: "feature",
-    sprint_id: 4,
-    assigned_to: null,
-    assigned_by: 2,
-    created_at: "2023-02-20T12:00:00Z",
-    updated_at: "2023-02-20T12:00:00Z"
-  },
-];
+  (error) => Promise.reject(error)
+);
+
+/* ======================================================
+   🔹 Response Interceptor (Auth Expiry)
+====================================================== */
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token might be expired, clear auth state
+      localStorage.removeItem('authState');
+      localStorage.removeItem('access_token');
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Issue API functions
 export const issueApi = {
   // GET all issues
   getIssues: async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockIssues;
+      const response = await apiClient.get<ApiResponse<any>>('/issues');
+      return response.data.data;
     } catch (error) {
       console.error('Error fetching issues:', error);
       throw error;
@@ -99,13 +78,8 @@ export const issueApi = {
   // GET issue by ID
   getIssueById: async (id: number) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const issue = mockIssues.find(i => i.id === id);
-      if (!issue) {
-        throw new Error(`Issue with id ${id} not found`);
-      }
-      return issue;
+      const response = await apiClient.get<ApiResponse<any>>(`/issues/${id}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching issue with id ${id}:`, error);
       throw error;
@@ -115,16 +89,8 @@ export const issueApi = {
   // POST create issue
   createIssue: async (issueData: any) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const newIssue = {
-        id: mockIssues.length + 1,
-        ...issueData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      mockIssues.push(newIssue);
-      return newIssue;
+      const response = await apiClient.post<ApiResponse<any>>('/issues', issueData);
+      return response.data.data;
     } catch (error) {
       console.error('Error creating issue:', error);
       throw error;
@@ -134,19 +100,8 @@ export const issueApi = {
   // PUT update issue
   updateIssue: async (id: number, issueData: any) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const issueIndex = mockIssues.findIndex(i => i.id === id);
-      if (issueIndex === -1) {
-        throw new Error(`Issue with id ${id} not found`);
-      }
-      const updatedIssue = {
-        ...mockIssues[issueIndex],
-        ...issueData,
-        updated_at: new Date().toISOString()
-      };
-      mockIssues[issueIndex] = updatedIssue;
-      return updatedIssue;
+      const response = await apiClient.put<ApiResponse<any>>(`/issues/${id}`, issueData);
+      return response.data.data;
     } catch (error) {
       console.error(`Error updating issue with id ${id}:`, error);
       throw error;
@@ -156,15 +111,8 @@ export const issueApi = {
   // DELETE issue
   deleteIssue: async (id: number) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const issueIndex = mockIssues.findIndex(i => i.id === id);
-      if (issueIndex === -1) {
-        throw new Error(`Issue with id ${id} not found`);
-      }
-      const deletedIssue = mockIssues[issueIndex];
-      mockIssues.splice(issueIndex, 1);
-      return deletedIssue;
+      const response = await apiClient.delete<ApiResponse<any>>(`/issues/${id}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error deleting issue with id ${id}:`, error);
       throw error;
@@ -174,10 +122,8 @@ export const issueApi = {
   // GET issues by status
   getIssuesByStatus: async (status: string) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const filteredIssues = mockIssues.filter(i => i.status.toLowerCase() === status.toLowerCase());
-      return filteredIssues;
+      const response = await apiClient.get<ApiResponse<any>>(`/issues?status=${status}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching issues with status ${status}:`, error);
       throw error;
@@ -187,10 +133,8 @@ export const issueApi = {
   // GET issues by priority
   getIssuesByPriority: async (priority: string) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const filteredIssues = mockIssues.filter(i => i.priority.toLowerCase() === priority.toLowerCase());
-      return filteredIssues;
+      const response = await apiClient.get<ApiResponse<any>>(`/issues?priority=${priority}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching issues with priority ${priority}:`, error);
       throw error;
@@ -200,11 +144,8 @@ export const issueApi = {
   // GET issues by project
   getIssuesByProject: async (projectId: number) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // For mock data, we'll filter by sprint_id which relates to projects
-      const filteredIssues = mockIssues.filter(i => i.sprint_id === projectId);
-      return filteredIssues;
+      const response = await apiClient.get<ApiResponse<any>>(`/issues?project_id=${projectId}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching issues for project ${projectId}:`, error);
       throw error;

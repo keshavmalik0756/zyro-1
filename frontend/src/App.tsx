@@ -1,50 +1,63 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AnimatePresence } from "framer-motion";
-
-import SignUp from "./components/custom/pages/auth/SignUp";
-import Login from "./components/custom/pages/auth/Login";
-import Forgot from "./components/custom/pages/auth/Forgot";
-import Reset from "./components/custom/pages/auth/Reset";
-import PageTransitionWrapper from "./components/custom/pages/auth/PageTransitionWrapper";
-
-import ProtectedRoute from "./routes/ProtectedRoute";
-import PublicRoute from "./routes/PublicRoute";
-
-import HomeLayout from "./layouts/HomeLayout";
-import Home from "./pages/home/Home";
-
-
-import Project from "./pages/projects/Project";
-
-import Issue from "./pages/issue/Issue";
-
 import { useSelector } from "react-redux";
-import { RootState } from "./redux/store";
+
+import SignUp from "@/components/custom/pages/auth/SignUp";
+import Login from "@/components/custom/pages/auth/Login";
+import Forgot from "@/components/custom/pages/auth/Forgot";
+import Reset from "@/components/custom/pages/auth/Reset";
+import PageTransitionWrapper from "@/components/custom/pages/auth/PageTransitionWrapper";
+
+import ProtectedRoute from "@/routes/ProtectedRoute";
+import PublicRoute from "@/routes/PublicRoute";
+
+import HomeLayout from "@/layouts/HomeLayout";
+import Home from "@/pages/manager/home/Home";
+
+import SettingsLayout from "@/pages/manager/settings/SettingsLayout";
+import OrganizationSettings from "@/pages/manager/settings/OrganizationSettings";
+import ProfileSettings from "@/pages/manager/settings/ProfileSettings";
+import BillingSettings from "@/pages/manager/settings/BillingSettings";
+import SecuritySettings from "@/pages/manager/settings/SecuritySettings";
+
+import { RootState } from "@/redux/store";
+
+import RoleProtectedRoute from "@/routes/RoleProtectedRoute";
+
+import AdminPage from "@/pages/admin/index";
+import ManagerPage from "@/pages/manager/index";
+import EmployeePage from "@/pages/employee/index";
+
+import Project from "@/pages/manager/projects/Project";
+import ProjectList from "@/pages/manager/projects/ProjectList";
+import CreateProject from "@/pages/manager/projects/CreateProject";
+import ProjectDetails from "@/pages/manager/projects/ProjectDetails";
+import EditProject from "@/pages/manager/projects/EditProject";
+import Issue from "@/pages/manager/issue/Issue";
 
 import "./App.css";
 
 function App() {
+  // 🔁 Redirect logic for root path
   const AuthRedirect = () => {
     const { user } = useSelector((state: RootState) => state.auth);
-
-    if (user) {
-      return <Navigate to="/home" replace />;
-    }
-
-    return <Navigate to="/signup" replace />;
+    return user ? (
+      <Navigate to="/manager" replace />
+    ) : (
+      <Navigate to="/signup" replace />
+    );
   };
 
   return (
     <div className="App">
-      {/* 🔔 Global Toast */}
+      {/* 🔔 Global Toast Configuration */}
       <Toaster
         position="top-right"
         reverseOrder={false}
         gutter={10}
         toastOptions={{
           duration: 3000,
-
           style: {
             background: "linear-gradient(135deg, #2563eb, #059669)",
             color: "#ffffff",
@@ -54,40 +67,20 @@ function App() {
             fontWeight: 500,
             boxShadow: "0 10px 25px rgba(0,0,0,0.18)",
           },
-
           success: {
             duration: 2500,
-            iconTheme: {
-              primary: "#22c55e",
-              secondary: "#ffffff",
-            },
           },
-
           error: {
             duration: 4500,
-            iconTheme: {
-              primary: "#ef4444",
-              secondary: "#ffffff",
-            },
           },
-
           loading: {
             duration: Infinity,
-            iconTheme: {
-              primary: "#facc15",
-              secondary: "#ffffff",
-            },
-          },
-
-          ariaProps: {
-            role: "status",
-            "aria-live": "polite",
           },
         }}
       />
-
       <AnimatePresence mode="wait">
         <Routes>
+          {/* ---------- ROOT ---------- */}
           <Route path="/" element={<AuthRedirect />} />
 
           {/* ---------- PUBLIC ROUTES ---------- */}
@@ -135,9 +128,9 @@ function App() {
             }
           />
 
-          {/* ---------- PROTECTED ROUTES ---------- */}
+          {/* ---------- HOME ---------- */}
           <Route
-            path="/home"
+            path="/manager"
             element={
               <ProtectedRoute>
                 <HomeLayout />
@@ -147,6 +140,43 @@ function App() {
             <Route index element={<Home />} />
           </Route>
 
+          {/* ---------- ADMIN DASHBOARD ---------- */}
+          <Route
+            path="/admin"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin']}>
+                <HomeLayout />
+              </RoleProtectedRoute>
+            }
+          >
+            <Route index element={<AdminPage />} />
+          </Route>
+
+          {/* ---------- MANAGER DASHBOARD ---------- */}
+          <Route
+            path="/manager"
+            element={
+              <RoleProtectedRoute allowedRoles={['manager', 'admin']}>
+                <HomeLayout />
+              </RoleProtectedRoute>
+            }
+          >
+            <Route index element={<ManagerPage />} />
+          </Route>
+
+          {/* ---------- EMPLOYEE DASHBOARD ---------- */}
+          <Route
+            path="/employee"
+            element={
+              <RoleProtectedRoute allowedRoles={['employee', 'manager', 'admin']}>
+                <HomeLayout />
+              </RoleProtectedRoute>
+            }
+          >
+            <Route index element={<EmployeePage />} />
+          </Route>
+
+          {/* ---------- PROJECTS (✅ CORRECT SETUP) ---------- */}
           <Route
             path="/projects"
             element={
@@ -155,9 +185,23 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Project />} />
+            {/* Project module wrapper */}
+            <Route element={<Project />}>
+              <Route index element={<ProjectList />} />
+              <Route path="create" element={<CreateProject />} />
+              <Route path=":id" element={<ProjectDetails />} />
+              <Route path=":id/edit" element={<EditProject />} />
+              <Route path=":id/overview" element={<ProjectDetails />} />
+              <Route path=":id/issues" element={<ProjectDetails />} />
+              <Route path=":id/kanban" element={<ProjectDetails />} />
+              <Route path=":id/team" element={<ProjectDetails />} />
+              <Route path=":id/timeline" element={<ProjectDetails />} />
+              <Route path=":id/analytics" element={<ProjectDetails />} />
+              <Route path=":id/settings" element={<ProjectDetails />} />
+            </Route>
           </Route>
 
+          {/* ---------- ISSUES ---------- */}
           <Route
             path="/issues"
             element={
@@ -168,6 +212,25 @@ function App() {
           >
             <Route index element={<Issue />} />
           </Route>
+
+          {/* ---------- SETTINGS ---------- */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <HomeLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route element={<SettingsLayout />}>
+              <Route index element={<OrganizationSettings />} />
+              <Route path="organization" element={<OrganizationSettings />} />
+              <Route path="profile" element={<ProfileSettings />} />
+              <Route path="billing" element={<BillingSettings />} />
+              <Route path="security" element={<SecuritySettings />} />
+            </Route>
+          </Route>
+
           {/* ---------- FALLBACK ---------- */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

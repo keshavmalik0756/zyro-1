@@ -4,19 +4,51 @@ import Navbar from "../components/custom/navigation/Navbar";
 
 const HomeLayout = () => {
   return (
-    <div className="flex h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 text-gray-800">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-50 text-gray-800">
+
       {/* Sidebar */}
       <Sidebar />
 
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Top Navbar */}
-        <Navbar />
+      {/* Main Wrapper */}
+      <div className="flex flex-col flex-1 min-w-0">
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-white/40 to-amber-50/30 text-gray-700">
-          <Outlet />
+        {/* Navbar */}
+        <div className="shrink-0 z-20">
+          <Navbar />
+        </div>
+
+        {/* Content Area */}
+        <main
+          className="
+    flex-1 min-h-0
+    px-4 sm:px-6 lg:px-10 py-6
+    bg-white/60 backdrop-blur-xl
+    rounded-tl-2xl
+    shadow-inner
+    text-gray-700
+    transition-all duration-300 ease-in-out
+
+    /* Scroll only on small devices */
+    overflow-y-auto
+
+    /* Scrollbar styling ONLY for small screens */
+    [&::-webkit-scrollbar]:w-[6px]
+    [&::-webkit-scrollbar-track]:bg-transparent
+    [&::-webkit-scrollbar-thumb]:bg-gray-400/60
+    [&::-webkit-scrollbar-thumb]:rounded-full
+    [&::-webkit-scrollbar-thumb]:hover:bg-gray-500/80
+
+    /* Remove scrollbar completely on large screens */
+    lg:[&::-webkit-scrollbar]:hidden
+  "
+        >
+          {/* Page Animation Wrapper */}
+          <div className="animate-fadeIn">
+            <Outlet />
+          </div>
         </main>
+
+
       </div>
     </div>
   );

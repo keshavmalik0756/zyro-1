@@ -1,45 +1,74 @@
-// Using mock data instead of actual API calls
+import axios from 'axios';
+import { ApiResponse } from './types';
 
-// Mock data for users
-const mockUsers = [
-  {
-    id: 1,
-    name: "Admin User",
-    email: "admin@example.com",
-    role: "admin",
-    status: "active",
-    created_at: "2023-01-01T10:00:00Z",
-    updated_at: "2023-01-01T10:00:00Z"
+// Create axios instance
+const apiClient = axios.create({
+  withCredentials: true,
+});
+
+/* ======================================================
+   🔹 Request Interceptor (Auth)
+====================================================== */
+apiClient.interceptors.request.use(
+  (config) => {
+    // Get token from the auth state stored in localStorage
+    const authStateStr = localStorage.getItem('authState');
+    let token = null;
+    
+    if (authStateStr) {
+      try {
+        const authState = JSON.parse(authStateStr);
+        token = authState.token;
+      } catch (e) {
+        console.error('Error parsing auth state:', e);
+      }
+    }
+    
+    // Fallback to direct access_token if authState doesn't contain token
+    if (!token) {
+      token = localStorage.getItem('access_token');
+    }
+    
+    if (token) {
+      if (!config.headers) {
+        config.headers = {};
+      }
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Set the base API URL dynamically
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+    config.baseURL = API_BASE_URL;
+    
+    return config;
   },
-  {
-    id: 2,
-    name: "Manager User",
-    email: "manager@example.com",
-    role: "manager",
-    status: "active",
-    created_at: "2023-01-02T10:00:00Z",
-    updated_at: "2023-01-02T10:00:00Z"
-  },
-  {
-    id: 3,
-    name: "Employee User",
-    email: "employee@example.com",
-    role: "employee",
-    status: "active",
-    created_at: "2023-01-03T10:00:00Z",
-    updated_at: "2023-01-03T10:00:00Z"
-  },
-];
+  (error) => Promise.reject(error)
+);
+
+/* ======================================================
+   🔹 Response Interceptor (Auth Expiry)
+====================================================== */
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token might be expired, clear auth state
+      localStorage.removeItem('authState');
+      localStorage.removeItem('access_token');
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // User API functions
 export const userApi = {
   // GET current user profile
   getCurrentUser: async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Return first user as mock current user
-      return mockUsers[0];
+      const response = await apiClient.get<ApiResponse<any>>('/users/me');
+      return response.data.data;
     } catch (error) {
       console.error('Error fetching current user:', error);
       throw error;
@@ -49,9 +78,8 @@ export const userApi = {
   // GET all users
   getUsers: async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockUsers;
+      const response = await apiClient.get<ApiResponse<any[]>>('/users');
+      return response.data.data;
     } catch (error) {
       console.error('Error fetching users:', error);
       throw error;
@@ -61,13 +89,8 @@ export const userApi = {
   // GET user by ID
   getUserById: async (id: number) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const user = mockUsers.find(u => u.id === id);
-      if (!user) {
-        throw new Error(`User with id ${id} not found`);
-      }
-      return user;
+      const response = await apiClient.get<ApiResponse<any>>(`/users/${id}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching user with id ${id}:`, error);
       throw error;
@@ -77,19 +100,8 @@ export const userApi = {
   // PUT update user profile
   updateUser: async (id: number, userData: any) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const userIndex = mockUsers.findIndex(u => u.id === id);
-      if (userIndex === -1) {
-        throw new Error(`User with id ${id} not found`);
-      }
-      const updatedUser = {
-        ...mockUsers[userIndex],
-        ...userData,
-        updated_at: new Date().toISOString()
-      };
-      mockUsers[userIndex] = updatedUser;
-      return updatedUser;
+      const response = await apiClient.put<ApiResponse<any>>(`/users/${id}`, userData);
+      return response.data.data;
     } catch (error) {
       console.error(`Error updating user with id ${id}:`, error);
       throw error;
@@ -99,25 +111,11 @@ export const userApi = {
   // POST login
   login: async (credentials: { email: string; password: string }) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Simple mock authentication
-      const user = mockUsers.find(u => u.email === credentials.email);
-      if (!user) {
-        throw new Error('Invalid email or password');
-      }
-      // In a real app, we would verify the password
-      const mockToken = `mock_token_${user.id}`;
-      localStorage.setItem('access_token', mockToken);
-      return {
-        status: "success",
-        message: "Login successful",
-        data: {
-          access_token: mockToken,
-          refresh_token: `mock_refresh_${user.id}`,
-          user_data: user
-        }
-      };
+      const response = await axios.post<ApiResponse<any>>(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1"}/auth/login`,
+        credentials
+      );
+      return response.data;
     } catch (error) {
       console.error('Error during login:', error);
       throw error;
@@ -125,37 +123,13 @@ export const userApi = {
   },
 
   // POST register
-  register: async (userData: { email: string; password: string; name: string }) => {
+  register: async (userData: { email: string; password: string; name: string; role?: string }) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Check if user already exists
-      const existingUser = mockUsers.find(u => u.email === userData.email);
-      if (existingUser) {
-        throw new Error('User already exists');
-      }
-      // Create new user
-      const newUser = {
-        id: mockUsers.length + 1,
-        name: userData.name,
-        email: userData.email,
-        role: "employee",
-        status: "active",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      mockUsers.push(newUser);
-      const mockToken = `mock_token_${newUser.id}`;
-      localStorage.setItem('access_token', mockToken);
-      return {
-        status: "success",
-        message: "Registration successful",
-        data: {
-          access_token: mockToken,
-          refresh_token: `mock_refresh_${newUser.id}`,
-          user_data: newUser
-        }
-      };
+      const response = await axios.post<ApiResponse<any>>(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1"}/auth/signup`,
+        userData
+      );
+      return response.data;
     } catch (error) {
       console.error('Error during registration:', error);
       throw error;
@@ -165,11 +139,8 @@ export const userApi = {
   // POST logout
   logout: async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Clear token
-      localStorage.removeItem('access_token');
-      return { success: true, message: "Logged out successfully" };
+      const response = await apiClient.post<ApiResponse<any>>('/auth/logout');
+      return response.data;
     } catch (error) {
       console.error('Error during logout:', error);
       throw error;
@@ -179,15 +150,11 @@ export const userApi = {
   // POST refresh token
   refreshToken: async (refreshToken: string) => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // Mock token refresh
-      const newToken = `mock_token_refreshed_${Date.now()}`;
-      localStorage.setItem('access_token', newToken);
-      return {
-        access_token: newToken,
-        refresh_token: refreshToken
-      };
+      const response = await axios.post<ApiResponse<any>>(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1"}/auth/refresh`,
+        { refresh_token: refreshToken }
+      );
+      return response.data.data;
     } catch (error) {
       console.error('Error refreshing token:', error);
       throw error;

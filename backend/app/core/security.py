@@ -42,3 +42,22 @@ async def create_refresh_token(data:dict,expires_minute:Optional[int] = None) ->
     })
     token= jwt.encode(to_encode,JWT_SECRET_KEY,algorithm=JWT_ALGORITHM)
     return token
+
+
+
+def decode_token(token: str) -> dict:
+    """
+    Decode JWT token and return payload
+    Raises ValueError for token-related errors (will be caught and converted to CredentialError in dependencies)
+    Raises ServerErrors for configuration errors
+    """
+    if not JWT_SECRET_KEY:
+        raise ServerErrors(message="JWT_SECRET_KEY is not configured. Please contact administrator.")
+    
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise ValueError("Token has expired")
+    except jwt.JWTError:
+        raise ValueError("Invalid token")

@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import {
-  LayoutDashboard,
+  Home,
   FolderKanban,
   CheckSquare,
   User,
@@ -10,123 +10,166 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
-import { RootState } from "../../../../redux/store";
+import { RootState } from "../../../redux/store";
+
+/* ======================================================
+   Sidebar
+====================================================== */
 
 const Sidebar = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const { user } = useSelector((state: RootState) => state.auth);
 
-  // Close mobile menu when route changes
+  /* Close on route change */
   useEffect(() => {
-    setIsMobileMenuOpen(false);
+    setIsMobileOpen(false);
   }, [location.pathname]);
 
-  // Close mobile menu on window resize if screen becomes larger
+  /* Close if resized to desktop */
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const onResize = () => window.innerWidth >= 768 && setIsMobileOpen(false);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const navItems = [
-    { path: "/home", label: "Home", icon: LayoutDashboard },
-    { path: "/projects", label: "Projects", icon: FolderKanban },
-    { path: "/issues", label: "Issues", icon: CheckSquare },
-    { path: "/profile", label: "Profile", icon: User },
-    { path: "/settings", label: "Settings", icon: Settings },
-  ];
+  /* Role-based navigation */
+  const NAV: Record<string, any[]> = {
+    admin: [
+      { path: "/admin", label: "Home", icon: Home },
+      { path: "/projects", label: "Projects", icon: FolderKanban },
+      { path: "/issues", label: "Issues", icon: CheckSquare },
+      { path: "/people", label: "People", icon: User },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ],
+    manager: [
+      { path: "/manager", label: "Home", icon: Home },
+      { path: "/projects", label: "Projects", icon: FolderKanban },
+      { path: "/issues", label: "Issues", icon: CheckSquare },
+      { path: "/people", label: "People", icon: User },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ],
+    employee: [
+      { path: "/employee", label: "Home", icon: Home },
+      { path: "/projects", label: "Projects", icon: FolderKanban },
+      { path: "/issues", label: "Issues", icon: CheckSquare },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ],
+    default: [
+      { path: "/home", label: "Home", icon: Home },
+      { path: "/projects", label: "Projects", icon: FolderKanban },
+      { path: "/issues", label: "Issues", icon: CheckSquare },
+      { path: "/people", label: "People", icon: User },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ],
+  };
+
+  const navItems = NAV[user?.role || "default"];
 
   return (
     <>
-      {/* Mobile menu button */}
+      {/* Mobile Toggle */}
       <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-blue-600 text-white"
-        onClick={() => setIsMobileMenuOpen(true)}
+        onClick={() => setIsMobileOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-gray-900 text-white shadow"
       >
-        <ChevronRight size={20} />
+        <ChevronRight size={18} />
       </button>
 
-      {/* Main container with click handler to close sidebar on outside click */}
-      <div 
-        className="relative h-full"
-        onClick={(e) => {
-          if (isMobileMenuOpen && (e.target as HTMLElement).closest('aside') === null) {
-            setIsMobileMenuOpen(false);
-          }
-        }}
+      {/* Overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm md:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`
+          fixed md:static z-50 h-full w-56
+          bg-white/80 backdrop-blur-xl
+          border-r border-gray-200/60
+          flex flex-col
+          transition-transform duration-300 ease-out
+          ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+          md:translate-x-0
+        `}
       >
-        {/* Sidebar */}
-        <aside
-          className={`fixed md:static md:translate-x-0 z-50 h-full flex flex-col bg-gradient-to-b from-blue-50 to-emerald-50 border-r border-blue-200/30 transition-transform duration-300 w-60
-          ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:flex md:w-auto md:translate-x-0 md:transform`}
-        >
-          {/* LOGO */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-blue-200/30 bg-gradient-to-r from-blue-100/40 to-emerald-100/40">
-            <h1 className="text-xl font-semibold bg-gradient-to-r from-blue-500 to-green-500 bg-clip-text text-transparent">
-              Zyro
-            </h1>
+        {/* Logo */}
+        <div className="
+  h-16 px-4
+  flex items-center justify-between
+  border-b border-gray-200
+  bg-white/80 backdrop-blur-md
+">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-green-500 text-white flex items-center justify-center font-bold">
+              Z
+            </div>
+            <span className="font-semibold text-gray-700 text-lg">Zyro</span>
+          </div>
 
-            {/* Close button for mobile */}
-            <button
-              className="md:hidden p-2 rounded-lg hover:bg-blue-100 text-blue-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMobileMenuOpen(false);
-              }}
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 text-gray-600"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {navItems.map(({ path, label, icon: Icon }) => (
+            <NavLink
+              key={path}
+              to={path}
+              className={({ isActive }) =>
+                `
+                group flex items-center gap-3 px-3 py-2 rounded-lg
+                text-xs font-medium transition-all
+                ${isActive
+                  ? "bg-green-50 text-green-700 shadow-sm"
+                  : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"
+                }
+              `
+              }
             >
-              <X size={18} />
-            </button>
-          </div>
+              <Icon size={16} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
 
-          {/* NAV */}
-          <nav className="flex-1 mt-4 space-y-1 px-3">
-            {navItems.map((item) => {
-              const Icon = item.icon;
+        {/* User Footer */}
+        <div className="px-4 py-4 border-t border-gray-200 bg-gray-50/60">
+          {user ? (
+            <div className="flex items-center gap-4">
 
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
-                    ${isActive
-                      ? "bg-emerald-500/20 text-emerald-700 font-medium border-l-2 border-emerald-500"
-                      : "text-blue-600/80 hover:bg-blue-100 hover:text-blue-700"
-                    }`}
-                >
-                  <Icon size={20} />
-                  <span className="text-sm">{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-
-          {/* FOOTER - User Info */}
-          <div className="p-4 border-t border-blue-200/30 bg-gradient-to-r from-blue-100/30 to-emerald-100/30">
-            {user ? (
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-emerald-400 flex items-center justify-center text-white text-xs font-semibold">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-emerald-800 truncate">{user.name}</p>
-                  <p className="text-xs text-emerald-600/80 truncate">{user.email}</p>
-                </div>
+              {/* Avatar */}
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 
+                      flex items-center justify-center text-white text-base font-semibold shadow-sm">
+                {user.name.charAt(0).toUpperCase()}
               </div>
-            ) : (
-              <div className="text-center py-2">
-                <p className="text-xs text-blue-600/70">Not logged in</p>
+
+              {/* User Info */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">
+                  {user.name}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user.email}
+                </p>
               </div>
-            )}
-          </div>
-        </aside>
-      </div>
+            </div>
+          ) : (
+            <div className="text-center py-3">
+              <p className="text-xs text-gray-500">Not logged in</p>
+            </div>
+          )}
+        </div>
+
+      </aside>
     </>
   );
 };

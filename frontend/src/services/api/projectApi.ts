@@ -1,72 +1,87 @@
-// Using mock data instead of actual API calls
+import axios from 'axios';
+import { ApiResponse } from './types';
 
-// Mock data for projects
-const mockProjects = [
-  {
-    id: 1,
-    name: "Website Redesign",
-    status: "active",
-    description: "Complete redesign of the company website with modern UI/UX.",
-    created_by: "Admin",
-    start_date: "2023-01-15",
-    end_date: "2023-04-15",
-    created_at: "2023-01-15T10:30:00Z",
-    updated_at: "2023-02-20T14:45:00Z"
+// Project interface for API
+interface ApiProject {
+  id: number | string;
+  name: string;
+  status: string;
+  description: string;
+  created_by: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Create axios instance
+const apiClient = axios.create({
+  withCredentials: true,
+});
+
+/* ======================================================
+   🔹 Request Interceptor (Auth)
+====================================================== */
+apiClient.interceptors.request.use(
+  (config) => {
+    // Get token from the auth state stored in localStorage
+    const authStateStr = localStorage.getItem('authState');
+    let token = null;
+    
+    if (authStateStr) {
+      try {
+        const authState = JSON.parse(authStateStr);
+        token = authState.token;
+      } catch (e) {
+        console.error('Error parsing auth state:', e);
+      }
+    }
+    
+    // Fallback to direct access_token if authState doesn't contain token
+    if (!token) {
+      token = localStorage.getItem('access_token');
+    }
+    
+    if (token) {
+      if (!config.headers) {
+        config.headers = {};
+      }
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Set the base API URL dynamically
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+    config.baseURL = API_BASE_URL;
+    
+    return config;
   },
-  {
-    id: 2,
-    name: "Mobile App Development",
-    status: "in progress",
-    description: "Building a cross-platform mobile application for iOS and Android.",
-    created_by: "Manager",
-    start_date: "2023-02-01",
-    end_date: "2023-06-01",
-    created_at: "2023-02-01T09:15:00Z",
-    updated_at: "2023-02-22T11:30:00Z"
-  },
-  {
-    id: 3,
-    name: "Database Migration",
-    status: "completed",
-    description: "Migrating legacy database to new cloud infrastructure.",
-    created_by: "Admin",
-    start_date: "2022-11-01",
-    end_date: "2022-12-15",
-    created_at: "2022-11-01T13:20:00Z",
-    updated_at: "2022-12-15T16:00:00Z"
-  },
-  {
-    id: 4,
-    name: "API Integration",
-    status: "upcoming",
-    description: "Integrating third-party services with our existing platform.",
-    created_by: "Manager",
-    start_date: "2023-03-01",
-    end_date: "2023-05-01",
-    created_at: "2023-02-20T08:45:00Z",
-    updated_at: "2023-02-20T08:45:00Z"
-  },
-  {
-    id: 5,
-    name: "Security Audit",
-    status: "delayed",
-    description: "Comprehensive security audit of all systems and applications.",
-    created_by: "Admin",
-    start_date: "2023-01-01",
-    end_date: "2023-02-01",
-    created_at: "2022-12-15T14:30:00Z",
-    updated_at: "2023-01-20T10:15:00Z"
-  },
-];
+  (error) => Promise.reject(error)
+);
+
+/* ======================================================
+   🔹 Response Interceptor (Auth Expiry)
+====================================================== */
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token might be expired, clear auth state
+      localStorage.removeItem('authState');
+      localStorage.removeItem('access_token');
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Project API functions
 export const projectApi = {
   // GET all projects
-  getProjects: async () => {
+  getProjects: async (): Promise<ApiProject[]> => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockProjects;
+      const response = await apiClient.get<ApiResponse<ApiProject[]>>('/projects');
+      return response.data.data;
     } catch (error) {
       console.error('Error fetching projects:', error);
       throw error;
@@ -74,15 +89,10 @@ export const projectApi = {
   },
 
   // GET project by ID
-  getProjectById: async (id: number) => {
+  getProjectById: async (id: number): Promise<ApiProject> => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const project = mockProjects.find(p => p.id === id);
-      if (!project) {
-        throw new Error(`Project with id ${id} not found`);
-      }
-      return project;
+      const response = await apiClient.get<ApiResponse<ApiProject>>(`/projects/${id}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching project with id ${id}:`, error);
       throw error;
@@ -90,18 +100,10 @@ export const projectApi = {
   },
 
   // POST create project
-  createProject: async (projectData: any) => {
+  createProject: async (projectData: any): Promise<ApiProject> => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const newProject = {
-        id: mockProjects.length + 1,
-        ...projectData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      mockProjects.push(newProject);
-      return newProject;
+      const response = await apiClient.post<ApiResponse<ApiProject>>('/projects', projectData);
+      return response.data.data;
     } catch (error) {
       console.error('Error creating project:', error);
       throw error;
@@ -109,21 +111,10 @@ export const projectApi = {
   },
 
   // PUT update project
-  updateProject: async (id: number, projectData: any) => {
+  updateProject: async (id: number, projectData: any): Promise<ApiProject> => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const projectIndex = mockProjects.findIndex(p => p.id === id);
-      if (projectIndex === -1) {
-        throw new Error(`Project with id ${id} not found`);
-      }
-      const updatedProject = {
-        ...mockProjects[projectIndex],
-        ...projectData,
-        updated_at: new Date().toISOString()
-      };
-      mockProjects[projectIndex] = updatedProject;
-      return updatedProject;
+      const response = await apiClient.put<ApiResponse<ApiProject>>(`/projects/${id}`, projectData);
+      return response.data.data;
     } catch (error) {
       console.error(`Error updating project with id ${id}:`, error);
       throw error;
@@ -131,17 +122,10 @@ export const projectApi = {
   },
 
   // DELETE project
-  deleteProject: async (id: number) => {
+  deleteProject: async (id: number): Promise<ApiProject> => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const projectIndex = mockProjects.findIndex(p => p.id === id);
-      if (projectIndex === -1) {
-        throw new Error(`Project with id ${id} not found`);
-      }
-      const deletedProject = mockProjects[projectIndex];
-      mockProjects.splice(projectIndex, 1);
-      return deletedProject;
+      const response = await apiClient.delete<ApiResponse<ApiProject>>(`/projects/${id}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error deleting project with id ${id}:`, error);
       throw error;
@@ -149,12 +133,10 @@ export const projectApi = {
   },
 
   // GET projects by status
-  getProjectsByStatus: async (status: string) => {
+  getProjectsByStatus: async (status: string): Promise<ApiProject[]> => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const filteredProjects = mockProjects.filter(p => p.status.toLowerCase() === status.toLowerCase());
-      return filteredProjects;
+      const response = await apiClient.get<ApiResponse<ApiProject[]>>(`/projects?status=${status}`);
+      return response.data.data;
     } catch (error) {
       console.error(`Error fetching projects with status ${status}:`, error);
       throw error;

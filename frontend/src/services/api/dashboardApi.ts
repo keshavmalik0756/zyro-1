@@ -1,89 +1,166 @@
-import axios from 'axios';
-import { DashboardStats, Project, Issue } from './types';
+import axios from "axios";
+import {
+  ApiResponse,
+  BackendDashboardData,
+  DashboardData,
+  DashboardStats,
+  RecentProject,
+  RecentIssue,
+} from "./types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-
-// Create axios instance with default config
+/* ======================================================
+   🔹 Axios Client
+====================================================== */
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  withCredentials: true,
 });
 
-// Request interceptor to add auth token
+/* ======================================================
+   🔹 Request Interceptor (Auth)
+====================================================== */
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const authStateStr = localStorage.getItem("authState");
+    let token: string | null = null;
+
+    if (authStateStr) {
+      try {
+        const authState = JSON.parse(authStateStr);
+        token = authState?.token;
+      } catch {
+        token = null;
+      }
+    }
+
+    if (!token) {
+      token = localStorage.getItem("access_token");
+    }
+
     if (token) {
       config.headers = {
         ...config.headers,
         Authorization: `Bearer ${token}`,
       };
     }
+
+    config.baseURL =
+      import.meta.env.VITE_API_BASE_URL ||
+      "http://localhost:8000/api/v1";
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle errors
+/* ======================================================
+   🔹 Response Interceptor (Auth Expiry)
+====================================================== */
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized access - maybe redirect to login
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
+      localStorage.removeItem("authState");
+      localStorage.removeItem("access_token");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
 );
 
-// Dashboard API functions
+/* ======================================================
+   🔹 Helpers
+====================================================== */
+const generateProjectId = (projectName: string) =>
+  projectName.toLowerCase().replace(/\s+/g, "-");
+
+/* ======================================================
+   🔹 Dashboard API
+====================================================== */
 export const dashboardApi = {
-  // GET dashboard statistics
-  getDashboardStats: async (): Promise<DashboardStats> => {
-    try {
-      const response = await apiClient.get<DashboardStats>('/dashboard/stats');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      throw error;
-    }
-  },
+  /* -----------------------------------------------
+     GET: Manager Dashboard
+  ------------------------------------------------ */
+  getDashboardData: async (): Promise<DashboardData> => {
+    const response =
+      await apiClient.get<ApiResponse<BackendDashboardData>>(
+        "/dashboard/manager"
+      );
 
-  // GET recent projects
-  getRecentProjects: async (limit: number = 4): Promise<Project[]> => {
-    try {
-      const response = await apiClient.get<Project[]>(`/dashboard/recent-projects?limit=${limit}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching recent projects:', error);
-      throw error;
-    }
-  },
+    const apiData = response.data;
 
-  // GET recent issues
-  getRecentIssues: async (limit: number = 4): Promise<Issue[]> => {
-    try {
-      const response = await apiClient.get<Issue[]>(`/dashboard/recent-issues?limit=${limit}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching recent issues:', error);
-      throw error;
+    if (!apiData.success || !apiData.data) {
+      throw new Error(apiData.message || "Dashboard fetch failed");
     }
-  },
 
-  // GET all dashboard data
-  getDashboardData: async (): Promise<any> => {
-    try {
-      const response = await apiClient.get('/dashboard');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      throw error;
-    }
+    const backend = apiData.data;
+
+    /* -------------------------------
+       🔹 Stats Mapping
+    -------------------------------- */
+    const stats: DashboardStats = {
+      total_projects: backend.cards.my_projects,
+      active_issues: backend.cards.active_issues,
+      active_sprints: backend.cards.active_sprints,
+      team_members: backend.cards.team_members,
+
+      // Backend does not provide trends yet
+      projects_trend: 0,
+      issues_trend: 0,
+      sprints_trend: 0,
+      members_trend: 0,
+    };
+
+    /* -------------------------------
+       🔹 Recent Projects Mapping
+    -------------------------------- */
+/* -------------------------------
+   🔹 Recent Projects Mapping (FIXED)
+-------------------------------- */
+const recent_projects: RecentProject[] =
+  backend.recent_projects.map((project, index) => {
+    const teamMembersArray = Array.isArray(project.team_members)
+      ? project.team_members
+      : [];
+
+    return {
+      id: index + 1,
+      name: project.project_name,
+      progress: project.project_completion_percentage,
+      total_task: project.total_task,
+      task_completed: project.task_completed,
+
+      status:
+        project.project_completion_percentage === 100
+          ? "completed"
+          : "active",
+
+      // ✅ SAFE
+      team_members: teamMembersArray.length,
+      team_members_details: teamMembersArray,
+
+      last_updated: "Recently updated",
+    };
+  });
+
+
+    /* -------------------------------
+       🔹 Recent Issues Mapping
+    -------------------------------- */
+    const recent_issues: RecentIssue[] =
+      backend.recent_issues.map((issue) => ({
+        id: issue.task_id,
+        title: issue.task_name,
+        project: issue.project_name,
+        status: issue.status,
+        priority: issue.priority,
+        assignee: issue.assigned_to,
+        created: `${issue.hours_ago}h ago`,
+      }));
+
+    return {
+      stats,
+      recent_projects,
+      recent_issues,
+    };
   },
 };
