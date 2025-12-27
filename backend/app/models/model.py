@@ -108,6 +108,7 @@ class Project(Base, TimestampMixin):
     organization_id = Column(Integer, ForeignKey(Organization.id), nullable=False)
 
     organization = relationship("Organization", back_populates="projects")
+    created_by_user = relationship("User", foreign_keys=[created_by], lazy="selectin")
 
     sprints = relationship("Sprint", back_populates="project", cascade="all, delete-orphan")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
@@ -188,6 +189,8 @@ class Issue(Base, TimestampMixin):
     assignee = relationship("User", foreign_keys=[assigned_to], lazy="selectin")
     reporter = relationship("User", foreign_keys=[assigned_by], lazy="selectin")
 
+    logs = relationship("Logs", back_populates="issue", cascade="all, delete-orphan")
+
 
 # ================= WORK LOGS =================
 
@@ -203,3 +206,5 @@ class Logs(Base, TimestampMixin):
     hour_worked = Column(Numeric, default=Decimal(0), nullable=False)
 
     description = Column(String)
+
+    issue = relationship("Issue", back_populates="logs")
