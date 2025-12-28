@@ -33,8 +33,11 @@ async def get_recent_projects_dashboard_data(user_id:int,session:AsyncSession,li
                 )
             ).label('completed_points')
         ).where(
-            Issue.sprint_id.in_(
-                select(Sprint.id).where(Sprint.project_id ==project.id)
+            or_(
+                Issue.sprint_id.in_(
+                    select(Sprint.id).where(Sprint.project_id == project.id)
+                ),
+                Issue.project_id == project.id
             ),
             Issue.status.notin_([IssueStatus.CANCELLED])
         )
@@ -56,22 +59,29 @@ async def get_recent_projects_dashboard_data(user_id:int,session:AsyncSession,li
         
 
         # Task Count for display
+        # Count issues that are either in sprints of this project OR directly linked to this project
         task_stmt = select(func.count(Issue.id)).where(
-            Issue.sprint_id.in_(
-                select(Sprint.id).where(Sprint.project_id == project.id)
+            or_(
+                Issue.sprint_id.in_(
+                    select(Sprint.id).where(Sprint.project_id == project.id)
+                ),
+                Issue.project_id == project.id
             ),
             Issue.status.notin_([IssueStatus.CANCELLED])
         )
-        task_result =await session.execute(task_stmt)
+        task_result = await session.execute(task_stmt)
         total_task = task_result.scalar() or 0
 
         completed_task_stmt = select(func.count(Issue.id)).where(
-            Issue.sprint_id.in_(
-                select(Sprint.id).where(Sprint.project_id == project.id)
+            or_(
+                Issue.sprint_id.in_(
+                    select(Sprint.id).where(Sprint.project_id == project.id)
+                ),
+                Issue.project_id == project.id
             ),
             Issue.status == IssueStatus.COMPLETED
         )
-        completed_task_result =await session.execute(completed_task_stmt)
+        completed_task_result = await session.execute(completed_task_stmt)
         completed_task = completed_task_result.scalar() or 0
 
         result_dict = {

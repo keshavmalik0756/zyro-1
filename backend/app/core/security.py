@@ -61,3 +61,5 @@ def decode_token(token: str) -> dict:
         raise ValueError("Token has expired")
     except jwt.JWTError:
         raise ValueError("Invalid token")
+
+
