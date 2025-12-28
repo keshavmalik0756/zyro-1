@@ -12,7 +12,7 @@ from app.core.enums import (
     Role, UserStatus,
     ProjectStatus, SprintStatus,
     IssueStatus, IssueType,
-    OrganizationStatus
+    OrganizationStatus, Priority
 )
 
 
@@ -113,6 +113,8 @@ class Project(Base, TimestampMixin):
     sprints = relationship("Sprint", back_populates="project", cascade="all, delete-orphan")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
 
+    
+
 
 class ProjectMember(Base, TimestampMixin):
     __tablename__ = "project_member"
@@ -179,9 +181,11 @@ class Issue(Base, TimestampMixin):
     type = Column(Enum(IssueType, name="issue_type_enum"),
                   default=IssueType.OTHER,
                   nullable=False)
-
-    sprint_id = Column(Integer, ForeignKey(Sprint.id))
-    assigned_to = Column(Integer, ForeignKey(User.id))
+    priority = Column(Enum(Priority,name = 'priority'),
+                    default = Priority.MODERATE,
+                    nullable = True)
+    sprint_id = Column(Integer, ForeignKey(Sprint.id),nullable=True)
+    assigned_to = Column(Integer, ForeignKey(User.id),nullable=True)
     assigned_by = Column(Integer, ForeignKey(User.id))
 
     sprint = relationship("Sprint", back_populates="issues")    
@@ -190,6 +194,9 @@ class Issue(Base, TimestampMixin):
     reporter = relationship("User", foreign_keys=[assigned_by], lazy="selectin")
 
     logs = relationship("Logs", back_populates="issue", cascade="all, delete-orphan")
+    project_id = Column(Integer, ForeignKey(Project.id), nullable=False)
+
+    project = relationship("Project", foreign_keys=[project_id], lazy="selectin")
 
 
 # ================= WORK LOGS =================
