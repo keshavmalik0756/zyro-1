@@ -13,20 +13,27 @@ from app.db.crud.issue_crud import (
     get_issue_by_id,
     create_issue,
     update_issue,
-    delete_issue
+    delete_issue,
+    get_user_issues
 )
 
 issue_router = APIRouter()
 
 @issue_router.get("/")  
 async def get_all_issues_api(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(allow_min_role(Role.EMPLOYEE)),
     session: AsyncSession = Depends(get_db),
 ):
     """
     Get all issues for the current user
     """
-    issues = await get_all_issues(
+    if current_user.role == Role.EMPLOYEE:
+        issues = await get_user_issues(
+            user_id = current_user.id,
+            session = session
+        )
+    else:
+        issues = await get_all_issues(
         user_id = current_user.id,
         session = session
     )
