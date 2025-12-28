@@ -63,12 +63,13 @@ async def get_issue_by_id(issue_id:int,session:AsyncSession) -> Issue:
     """
     Get an issue by id
     """
-    issue_stmt = select(Issue).where(Issue.id == issue_id).options(
-        selectinload(Issue.assignee),
-        selectinload(Issue.reporter),
-        selectinload(Issue.project),
-        selectinload(Issue.sprint)
-    )
+    # issue_stmt = select(Issue).where(Issue.id == issue_id).options(
+    #     selectinload(Issue.assignee),
+    #     selectinload(Issue.reporter),
+    #     selectinload(Issue.project),
+    #     selectinload(Issue.sprint)
+    # )
+    issue_stmt = select(Issue).where(Issue.id == issue_id)
 
     result = await session.execute(issue_stmt)
     issue = result.scalar_one_or_none()
@@ -128,3 +129,18 @@ async def delete_issue(session:AsyncSession,issue_id:int)->bool:
     await session.delete(issue)
     await session.commit()
     return True
+
+async def get_user_issues(user_id:int,session:AsyncSession) -> List[Issue]:
+    """
+    Get all issues for a user
+    """
+    # stmt = select(Issue).where(Issue.assigned_to == user_id).options(
+    #     selectinload(Issue.assignee),
+    #     selectinload(Issue.reporter),
+    #     selectinload(Issue.project),
+    #     selectinload(Issue.sprint)
+    # )
+    stmt = select(Issue).where(Issue.assigned_to == user_id)
+    result = await session.execute(stmt)
+    issues = result.scalars().all()
+    return list(issues)
