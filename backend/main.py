@@ -26,6 +26,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5174",
+        "https://zyro-g2c4.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
