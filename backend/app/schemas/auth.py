@@ -8,3 +8,8 @@ class SignUpRequest(BaseModel):
 class LoginRequest(BaseModel):
     email:str
     password:str
+
+class User(BaseModel):
+    id: int
+    name: str
+    email: str

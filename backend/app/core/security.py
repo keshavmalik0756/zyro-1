@@ -1,7 +1,7 @@
 import bcrypt
 from typing import Optional
 from datetime import datetime,timedelta
-from jose import jwt
+from jose import jwt, JWTError
 from app.core.conf import JWT_SECRET_KEY,JWT_ACCESS_TOKEN_EXPIRE_MINUTES,JWT_ALGORITHM,JWT_REFRESH_TOKEN_EXPIRE_MINUTES
 from app.common.errors import ServerErrors
 
@@ -42,6 +42,7 @@ async def create_refresh_token(data:dict,expires_minute:Optional[int] = None) ->
     })
     token= jwt.encode(to_encode,JWT_SECRET_KEY,algorithm=JWT_ALGORITHM)
     return token
+
 
 
 def decode_token(token: str) -> dict:

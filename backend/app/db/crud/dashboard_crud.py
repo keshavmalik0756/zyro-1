@@ -85,11 +85,11 @@ async def get_recent_projects_dashboard_data(user_id:int,session:AsyncSession,li
         completed_task = completed_task_result.scalar() or 0
 
         result_dict = {
-            "project_name":project.name,
-            "total_task":total_task,
-            "task_completed":completed_task,
-            "project_completion_percentage":percentage,   # Based on the story points
-
+            "project_id": project.id,
+            "project_name": project.name,
+            "total_task": total_task,
+            "task_completed": completed_task,
+            "project_completion_percentage": percentage,
         }
         recent_projects_data.append(result_dict)
 

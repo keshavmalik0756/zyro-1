@@ -66,7 +66,7 @@ async def get_project_by_id_api(
 async def create_new_project(
     request:ProjectRequest,
     session:AsyncSession = Depends(get_db),
-    create_user:User = Depends(get_current_user),
+    current_user:User = Depends(get_current_user),
 ):
     """
      API to create a new project
@@ -75,7 +75,7 @@ async def create_new_project(
     project_data = request.model_dump()
     project = await create_project(
         session = session,
-        user_id = create_user.id,
+        user_id = current_user.id,
         project_data = project_data
     )
     if not project:

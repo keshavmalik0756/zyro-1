@@ -5,6 +5,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  role: string;
 }
 
 /* ---------------------------------- */
@@ -30,9 +31,25 @@ export interface RegisterPayload {
   name: string;
   email: string;
   password: string;
+  role?: string;
 }
 
 export interface SetAuthStatePayload {
   user: User | null;
   token: string | null;
+}
+
+/* ---------------------------------- */
+/* API Response Types */
+/* ---------------------------------- */
+export interface AuthResponseData {
+  access_token: string;
+  refresh_token: string;
+  user_data: User;
+}
+
+export interface ApiResponse<T> {
+  status: string;
+  message: string;
+  data: T;
 }

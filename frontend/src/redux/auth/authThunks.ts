@@ -3,6 +3,8 @@ import axios from "axios";
 import {
   LoginPayload,
   RegisterPayload,
+  ApiResponse,
+  AuthResponseData,
 } from "./authTypes";
 
 // Create axios instance without baseURL initially
@@ -16,6 +18,9 @@ API.interceptors.request.use(
     const token = localStorage.getItem('authState') ? 
       JSON.parse(localStorage.getItem('authState')!).token : null;
     if (token) {
+      if (!config.headers) {
+        config.headers = {};
+      }
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -48,7 +53,7 @@ export const loginUser = createAsyncThunk(
   "auth/login",
   async ({ email, password }: LoginPayload, { rejectWithValue }) => {
     try {
-      const res = await API.post(`${getApiUrl()}/auth/login`, { email, password });
+      const res = await API.post<ApiResponse<AuthResponseData>>(`${getApiUrl()}/auth/login`, { email, password });
       // The backend returns data in the format: {status, message, data: {access_token, refresh_token, user_data}}
       return res.data.data;
     } catch (err: any) {
@@ -62,12 +67,13 @@ export const loginUser = createAsyncThunk(
 /* ---------------- SIGNUP ---------------- */
 export const registerUser = createAsyncThunk(
   "auth/register",
-  async ({ name, email, password }: RegisterPayload, { rejectWithValue }) => {
+  async ({ name, email, password, role }: RegisterPayload, { rejectWithValue }) => {
     try {
-      const res = await API.post(`${getApiUrl()}/auth/signup`, {
+      const res = await API.post<ApiResponse<AuthResponseData>>(`${getApiUrl()}/auth/signup`, {
         name,
         email,
         password,
+        role,
       });
       // The backend returns data in the format: {status, message, data: {access_token, refresh_token, user_data}}
       return res.data.data;
