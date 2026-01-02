@@ -45,7 +45,7 @@ async def signup(
     payload = {
         "user_id":user.id,
         "email":user.email,
-        "role":user.role
+        "role":user.role.value
     }
     access_token = await create_access_token(payload)
     refresh_token = await create_refresh_token(payload)
@@ -54,7 +54,7 @@ async def signup(
         "id":user.id,
         "name":user.name,
         "email":user.email,
-        "role":user.role
+        "role":user.role.value
     }
 
     return {
@@ -92,6 +92,7 @@ async def login(
     payload = {
         "user_id": user.id,
         "email": user.email
+        "role":user.role.value
     }
 
     access_token = await create_access_token(payload)
@@ -101,7 +102,7 @@ async def login(
         "id":user.id,
         "name":user.name,
         "email":user.email,
-        "role":user.role
+        "role":user.role.value
     }
 
     return {
@@ -135,7 +136,7 @@ async def refresh_token(
     new_payload = {
         "user_id":user.id,
         "email":user.email,
-        "role":user.role
+        "role":user.role.value
     }
 
     new_access_token = await create_access_token(new_payload)
@@ -145,7 +146,7 @@ async def refresh_token(
         "id":user.id,
         "name":user.name,
         "email":user.email,
-        "role":user.role
+        "role":user.role.value
     }
 
     return {
