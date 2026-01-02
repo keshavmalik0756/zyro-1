@@ -91,7 +91,7 @@ async def login(
 
     payload = {
         "user_id": user.id,
-        "email": user.email
+        "email": user.email,
         "role":user.role.value
     }
 
