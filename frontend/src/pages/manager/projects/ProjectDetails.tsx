@@ -15,7 +15,7 @@ import {
   BarChart3,
   Settings,
   Folder,
-  Clock,
+ 
   ArrowLeft,
   User,
 } from "lucide-react";
@@ -32,7 +32,7 @@ import SettingsTab from "@/pages/manager/projects/tabs/SettingsTab";
 import { projectApi } from "@/services/api/projectApi";
 import { issueApi } from "@/services/api/issueApi";
 import { Project } from "@/services/api/types";
-import { getStatusColor } from "@/utils/projectStatus";
+
 
 /* ======================================================
    HELPERS
@@ -322,16 +322,9 @@ const ProjectDetails = () => {
   );
 };
 
-/* ======================================================
-   SMALL HELPERS
-====================================================== */
 
-const Meta = ({ icon: Icon, label }: any) => (
-  <div className="flex items-center gap-2 text-gray-600">
-    <Icon size={14} className="text-gray-600" />
-    <span className="truncate">{label}</span>
-  </div>
-);
+
+
 
 const ProjectSkeleton = () => (
   <div className="min-h-screen flex items-center justify-center text-gray-400">
