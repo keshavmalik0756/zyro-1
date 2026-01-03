@@ -78,8 +78,8 @@ export const userApi = {
   // GET all users
   getUsers: async () => {
     try {
-      const response = await apiClient.get<ApiResponse<any[]>>('/users');
-      return response.data.data;
+      const response = await apiClient.get<{ message: string; users: any[] }>('/user/');
+      return response.data.users;
     } catch (error) {
       console.error('Error fetching users:', error);
       throw error;
@@ -89,21 +89,43 @@ export const userApi = {
   // GET user by ID
   getUserById: async (id: number) => {
     try {
-      const response = await apiClient.get<ApiResponse<any>>(`/users/${id}`);
-      return response.data.data;
+      const response = await apiClient.get<{ message: string; user: any }>(`/user/${id}`);
+      return response.data.user;
     } catch (error) {
       console.error(`Error fetching user with id ${id}:`, error);
       throw error;
     }
   },
 
-  // PUT update user profile
-  updateUser: async (id: number, userData: any) => {
+  // POST create/invite user
+  createUser: async (userData: { name: string; email: string; role: string; organization_id: number }) => {
     try {
-      const response = await apiClient.put<ApiResponse<any>>(`/users/${id}`, userData);
+      const response = await apiClient.post<{ message: string; user_id: number; invite_token?: string }>('/user/create', userData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  },
+
+  // PUT update user
+  updateUser: async (id: number, userData: { name?: string; email?: string; role?: string; organization_id?: number; status?: string }) => {
+    try {
+      const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/user/${id}`, userData);
       return response.data.data;
     } catch (error) {
       console.error(`Error updating user with id ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // DELETE user
+  deleteUser: async (id: number) => {
+    try {
+      const response = await apiClient.delete<{ message: string }>(`/user/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting user with id ${id}:`, error);
       throw error;
     }
   },
