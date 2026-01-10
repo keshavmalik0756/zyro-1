@@ -1,21 +1,18 @@
-from fastapi import HTTPException, Request
 import traceback
-import logging
 from contextvars import ContextVar
 from uuid import uuid4
-
-from fastapi.exceptions import RequestValidationError
 from functools import wraps
 from typing import List, Callable, Literal, cast, Optional
+
+from fastapi import HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 
 from app.common.errors import UserErrors, ClientErrors, DatabaseErrors
 from app.utils.request_data_extractor import RequestDataExtractor
 from app.core.conf import APP_NAME, ENVIRONMENT
 from app.common.error_manager import ErrorMessageManager
-
-# Setup logging
-logger = logging.getLogger(__name__)
+from app.common.logging import Logger
 
 # Context variable for request ID
 request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
@@ -30,12 +27,6 @@ def create_request_id() -> str:
     request_id_var.set(req_id)
     return req_id
 
-LOG_LEVELS = {
-    'ERROR': logger.error,
-    'CRITICAL': logger.critical,
-    'INFO': logger.info,
-    'WARNING': logger.warning
-}
 
 
 class ExceptionHandler:
@@ -45,32 +36,61 @@ class ExceptionHandler:
         request: Request,
         exc: Exception
     ):
+        import sys
+        print(f"ExceptionHandler.__init__ called with exception: {type(exc).__name__}", file=sys.stdout, flush=True)
+        Logger.info(f"ExceptionHandler initialized - Exception: {type(exc).__name__} from {type(exc).__module__}")
+        
         self.request = request
         self.request_data_extractor = RequestDataExtractor(request)
         self.exc = exc
 
     async def _publish_error_message(self, error_data: dict):
         """Publish error message using ErrorMessageManager."""
+        from app.core.conf import ENABLE_ERROR_EMAILS
+        
+        error_type = error_data.get('error_type', 'UnknownError')
+        log_level = self._determine_log_level(error_type)
+        
+        Logger.info(f"Publishing error message - Type: {error_type}, Log Level: {log_level}, ENABLE_ERROR_EMAILS: {ENABLE_ERROR_EMAILS}")
+        
         error_message_manager = ErrorMessageManager(
             product=APP_NAME,
             module=APP_NAME,
-            log_level="critical",
+            log_level=log_level,
             token_data=error_data.get('token_data', {}),
             uri=error_data.get('uri', 'unknown-uri'),
             error=error_data.get('err', 'Unhandled error'),
             traceback=error_data.get('traceback', ''),
-            error_type=error_data.get('error_type', 'UnknownError'),
+            error_type=error_type,
             request_data=error_data.get('request_data', {}),
             headers=error_data.get('headers', {}),
             method=error_data.get('method', 'unknown'),
             exclude=[],
-            additional_info={}
+            additional_info={},
+            environment=ENVIRONMENT.lower()
         )
-        error_message_manager.set_channel('logger')
-        error_message_manager.set_log_level('error')
+        
+        channel = 'mail' if ENABLE_ERROR_EMAILS else 'logger'
+        error_message_manager.set_channel(channel)
+        error_message_manager.set_log_level(log_level)
+        
         await error_message_manager.publish_error_message()
+    
+    def _determine_log_level(self, error_type: str) -> str:
+        """Determine log level based on error type."""
+        critical_errors = ['DatabaseErrors', 'ServerErrors', 'UnknownError']
+        return 'critical' if error_type in critical_errors else 'error'
 
     async def handle_exception(self):
+        error_type = type(self.exc).__name__
+        error_module = type(self.exc).__module__
+        Logger.info(f"Handling exception: {error_type} from {error_module}")
+        
+        # Check for SQLAlchemy database errors first
+        if self._is_sqlalchemy_error(self.exc):
+            Logger.info(f"Routing SQLAlchemy error to database_error_handler")
+            return await self.database_error_handler()
+        
         if isinstance(self.exc, HTTPException):
             return await self.http_exception_handler()
         
@@ -78,6 +98,7 @@ class ExceptionHandler:
             return await self.validation_error_handler()
         
         elif isinstance(self.exc, DatabaseErrors):
+            Logger.info(f"Routing DatabaseErrors to database_error_handler")
             return await self.database_error_handler()
         
         elif isinstance(self.exc, UserErrors):
@@ -85,32 +106,53 @@ class ExceptionHandler:
 
         elif isinstance(self.exc, ClientErrors):
             return await self.client_error_handler()
+        
+        Logger.info(f"Routing unknown error to unknown_error_handler")
         return await self.unknown_error_handler()
     
+    def _is_sqlalchemy_error(self, exc: Exception) -> bool:
+        """Check if exception is a SQLAlchemy database error."""
+        error_type = type(exc).__name__
+        error_module = type(exc).__module__
+        
+        # Check if it's a SQLAlchemy error
+        if 'sqlalchemy' in error_module.lower():
+            Logger.info(f"Detected SQLAlchemy error: {error_type} from module {error_module}")
+            return True
+        
+        # Check for common SQLAlchemy error types
+        sqlalchemy_errors = [
+            'IntegrityError', 'OperationalError', 'ProgrammingError',
+            'DataError', 'DatabaseError', 'InterfaceError', 'InternalError',
+            'NotSupportedError', 'DisconnectionError'
+        ]
+        is_sqlalchemy = error_type in sqlalchemy_errors
+        if is_sqlalchemy:
+            Logger.info(f"Detected SQLAlchemy error type: {error_type}")
+        return is_sqlalchemy
+    
     def log_error(self):
-        try:
-            log_message = (
-                f'{self.request_data_extractor.get_request_method()} : '
-                f'{self.request_data_extractor.get_request_url()} : '
-                f'{str(self.exc)}'
-            )
-            
-            # Safely format traceback
-            try:
-                if self.exc.__traceback__:
-                    log_message += f'\n{"".join(traceback.format_exception(type(self.exc), value=self.exc, tb=self.exc.__traceback__))}'
-            except Exception:
-                log_message += f'\n[Traceback formatting failed]'
-            
-            if not isinstance(self.exc, UserErrors):
-                logger.error(log_message)
-                return
-            
-            log_level = getattr(self.exc, 'log_level', 'ERROR')
-            LOG_LEVELS.get(log_level, logger.error)(log_message)
-        except Exception as e:
-            # If logging fails, just log a simple message
-            logger.error(f"Failed to log error: {str(e)}, Original: {str(self.exc)}")
+        log_message = (
+            f'{self.request_data_extractor.get_request_method()} : '
+            f'{self.request_data_extractor.get_request_url()} : '
+            f'{str(self.exc)}'
+        )
+        
+        if self.exc.__traceback__:
+            log_message += f'\n{"".join(traceback.format_exception(type(self.exc), value=self.exc, tb=self.exc.__traceback__))}'
+        
+        if not isinstance(self.exc, UserErrors):
+            Logger.error(log_message)
+            return
+        
+        log_level = getattr(self.exc, 'log_level', 'ERROR')
+        LOG_LEVELS = {
+            'ERROR': Logger.error,
+            'CRITICAL': Logger.critical,
+            'INFO': Logger.info,
+            'WARNING': Logger.warning
+        }
+        LOG_LEVELS.get(log_level, Logger.error)(log_message)
 
     async def prepare_error_data(self, exclude_fields: List[str] = []):
         error_data = {
@@ -161,10 +203,15 @@ class ExceptionHandler:
             if "error_type" not in exclude_fields:
                 if isinstance(self.exc, UserErrors):
                     error_data['error_type'] = getattr(self.exc, 'type', type(self.exc).__name__)
+                elif isinstance(self.exc, ClientErrors):
+                    error_data['error_type'] = getattr(self.exc, 'type', type(self.exc).__name__)
+                elif self._is_sqlalchemy_error(self.exc):
+                    error_data['error_type'] = 'DatabaseErrors'
                 else:
-                    error_data['error_type'] = type(self.exc).__name__
+                    # All other unknown errors should be classified as UnknownError
+                    error_data['error_type'] = 'UnknownError'
         except Exception as e:
-            logger.error(f"Error in prepare_error_data: {str(e)}", exc_info=True)
+            Logger.error(f"Error in prepare_error_data: {str(e)}", exc_info=True)
             # Return minimal error data if preparation fails
             error_data['err'] = str(self.exc)
             error_data['error_type'] = type(self.exc).__name__
@@ -190,47 +237,44 @@ class ExceptionHandler:
         )
     
     async def database_error_handler(self):
-        self.exc: DatabaseErrors
+        Logger.info(f"database_error_handler called for exception: {type(self.exc).__name__}")
         
-        try:
-            # Get error attributes safely
+        # Handle both DatabaseErrors and SQLAlchemy errors
+        if isinstance(self.exc, DatabaseErrors):
             error_type = getattr(self.exc, 'type', type(self.exc).__name__)
             error_message = getattr(self.exc, 'message', str(self.exc))
             response_code = getattr(self.exc, 'response_code', 500)
-            
-            # Return response immediately
-            response = JSONResponse(
-                content={
-                    'details': {
-                        'type': error_type,
-                        'message': error_message
-                    },
-                    'message': error_message,
-                    'success': False
+        else:
+            # SQLAlchemy error - convert to DatabaseErrors format
+            error_type = 'DatabaseErrors'
+            error_message = f"Database error: {str(self.exc)}"
+            response_code = 500
+            Logger.info(f"Converted SQLAlchemy error to DatabaseErrors format")
+        
+        # Return response immediately
+        response = JSONResponse(
+            content={
+                'details': {
+                    'type': error_type,
+                    'message': error_message
                 },
-                status_code=response_code
-            )
-            
-            # Log error synchronously (non-blocking)
-            try:
-                self.log_error()
-            except Exception as log_error:
-                logger.warning(f"Failed to log database error: {str(log_error)}")
-            
-            return response
-        except Exception as e:
-            logger.error(f"Error in database_error_handler: {str(e)}", exc_info=True)
-            return JSONResponse(
-                content={
-                    'details': {
-                        'type': 'DatabaseError',
-                        'message': 'Database operation failed'
-                    },
-                    'message': str(self.exc),
-                    'success': False
-                },
-                status_code=getattr(self.exc, 'response_code', 500)
-            )
+                'message': error_message,
+                'success': False
+            },
+            status_code=response_code
+        )
+        
+        # Log error and send email notification
+        Logger.info("Logging error and preparing error data for email")
+        self.log_error()
+        data = await self.prepare_error_data(exclude_fields=["request_data"])
+        # Override error_type for SQLAlchemy errors
+        if not isinstance(self.exc, DatabaseErrors):
+            data['error_type'] = 'DatabaseErrors'
+        Logger.info(f"Error data prepared - error_type: {data.get('error_type')}, calling _publish_error_message")
+        await self._publish_error_message(data)
+        
+        return response
     
     async def http_exception_handler(self):
         return JSONResponse(
@@ -271,17 +315,18 @@ class ExceptionHandler:
                 status_code=response_code
             )
             
-            # Log error synchronously (quick operation, no request body reading)
-            try:
-                self.log_error()
-            except Exception as log_error:
-                logger.warning(f"Failed to log error: {str(log_error)}")
+            # Log error and send email notification for critical errors
+            self.log_error()
+            log_level = getattr(self.exc, 'log_level', 'ERROR')
+            if log_level in ['ERROR', 'CRITICAL']:
+                data = await self.prepare_error_data(exclude_fields=["request_data"])
+                await self._publish_error_message(data)
             
             return response
             
         except Exception as e:
             # If error handler itself fails, log and return generic error
-            logger.error(f"Error in user_error_handler: {str(e)}", exc_info=True)
+            Logger.error(f"Error in user_error_handler: {str(e)}", exc_info=True)
             
             # Try to at least return the right status code
             response_code = getattr(self.exc, 'response_code', 500) if hasattr(self.exc, 'response_code') else 500
@@ -316,15 +361,12 @@ class ExceptionHandler:
                 status_code=response_code
             )
             
-            # Log error synchronously (non-blocking)
-            try:
-                self.log_error()
-            except Exception as log_error:
-                logger.warning(f"Failed to log client error: {str(log_error)}")
+            # Log error
+            self.log_error()
             
             return response
         except Exception as e:
-            logger.error(f"Error in client_error_handler: {str(e)}", exc_info=True)
+            Logger.error(f"Error in client_error_handler: {str(e)}", exc_info=True)
             return JSONResponse(
                 content={
                     'message': str(self.exc),
@@ -348,22 +390,17 @@ class ExceptionHandler:
                 status_code=500
             )
             
-            # Try to log and publish error message in background (non-blocking)
-            try:
-                self.log_error()
-                # Try to prepare error data without request body to avoid hanging
-                try:
-                    data = await self.prepare_error_data(exclude_fields=["request_data"])
-                    await self._publish_error_message(data)
-                except Exception as prep_error:
-                    logger.warning(f"Failed to prepare/publish error message: {str(prep_error)}")
-            except Exception as log_error:
-                logger.warning(f"Failed to log unknown error: {str(log_error)}")
+            # Log error and send email notification
+            Logger.info("unknown_error_handler: Logging error and preparing error data for email")
+            self.log_error()
+            data = await self.prepare_error_data(exclude_fields=["request_data"])
+            Logger.info(f"unknown_error_handler: Error data prepared - error_type: {data.get('error_type')}, calling _publish_error_message")
+            await self._publish_error_message(data)
             
             return response
         except Exception as e:
             # If even the error handler fails, return minimal response
-            logger.error(f"Critical error in unknown_error_handler: {str(e)}", exc_info=True)
+            Logger.error(f"Critical error in unknown_error_handler: {str(e)}", exc_info=True)
             return JSONResponse(
                 content={
                     'details': {
@@ -380,40 +417,27 @@ class ExceptionHandler:
 # FastAPI exception handler functions
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for FastAPI."""
-    # Log that we're handling the exception
-    logger.info(f"Global exception handler called for: {type(exc).__name__}")
+    import sys
     
-    try:
-        handler = ExceptionHandler(request, exc)
-        result = await handler.handle_exception()
-        logger.info(f"Exception handler completed successfully for: {type(exc).__name__}")
-        return result
-    except Exception as handler_error:
-        # If exception handler itself fails, log and return generic error
-        logger.error(f"Exception handler failed: {str(handler_error)}", exc_info=True)
-        logger.error(f"Original exception: {str(exc)}", exc_info=True)
-        
-        # Try to get response code from original exception if it's a UserErrors
-        if isinstance(exc, UserErrors):
-            response_code = getattr(exc, 'response_code', 500)
-            error_message = getattr(exc, 'message', str(exc))
-            error_type = getattr(exc, 'type', type(exc).__name__)
-        else:
-            response_code = 500
-            error_message = str(exc) if exc else 'Unknown error'
-            error_type = type(exc).__name__
-        
-        return JSONResponse(
-            content={
-                'details': {
-                    'type': error_type,
-                    'message': error_message
-                },
-                'message': error_message,
-                'success': False
-            },
-            status_code=response_code
-        )
+    # Force immediate output
+    sys.stdout.write("=" * 80 + "\n")
+    sys.stdout.write(f"GLOBAL EXCEPTION HANDLER CALLED\n")
+    sys.stdout.write(f"Exception type: {type(exc).__name__}\n")
+    sys.stdout.write(f"Exception module: {type(exc).__module__}\n")
+    sys.stdout.write(f"Exception message: {str(exc)[:200]}\n")
+    sys.stdout.write("=" * 80 + "\n")
+    sys.stdout.flush()
+    
+    Logger.info(f"GLOBAL EXCEPTION HANDLER CALLED - Type: {type(exc).__name__}, Module: {type(exc).__module__}, Message: {str(exc)[:200]}")
+    
+    handler = ExceptionHandler(request, exc)
+    result = await handler.handle_exception()
+    
+    sys.stdout.write(f"Exception handler completed, returning response\n")
+    sys.stdout.flush()
+    Logger.info(f"Exception handler completed successfully")
+    
+    return result
 
 
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -424,6 +448,14 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handler for RequestValidationError."""
+    import sys
+    import json
+    print("=" * 80, file=sys.stdout, flush=True)
+    print("VALIDATION ERROR DETECTED:", file=sys.stdout, flush=True)
+    print(f"Errors: {json.dumps(exc.errors(), indent=2, default=str)}", file=sys.stdout, flush=True)
+    print(f"URL: {request.url}", file=sys.stdout, flush=True)
+    print(f"Method: {request.method}", file=sys.stdout, flush=True)
+    print("=" * 80, file=sys.stdout, flush=True)
     handler = ExceptionHandler(request, exc)
     return await handler.validation_error_handler()
 
@@ -447,7 +479,7 @@ def after_request_exception_handler(
                 return await func(*args, **kwargs)
         
             except UserErrors as exc:
-                logger.error(
+                Logger.error(
                     logger_format.format(
                         funcname=f'{func.__code__.co_filename}:{func.__name__}', 
                         args=args, 
@@ -473,7 +505,7 @@ def after_request_exception_handler(
                 raise  # Re-raise to let FastAPI handle it
     
             except Exception as exc:
-                logger.error(
+                Logger.error(
                     logger_format.format(
                         funcname=f'{func.__code__.co_filename}:{func.__name__}', 
                         args=args, 

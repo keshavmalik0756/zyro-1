@@ -12,6 +12,10 @@ from sqlalchemy import select,func
 from app.common.email_template import invite_email
 from app.core.security import hash_password
 from app.db.connection import get_db
+from app.db.crud.user import get_user_by_id
+from app.common.errors import NotFoundError,PermissionDeniedError
+from typing import Optional
+from app.db.crud.user import get_all_team_users_under_manager,get_all_managers
 
 
 
@@ -29,6 +33,15 @@ class UpdatePasswordRequest(BaseModel):
  
 class verifyTokenResponse(BaseModel):
    raw_token: str   
+
+class UpdateUserRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[Role] = None
+    status: Optional[UserStatus] = None
+    organization_id: Optional[int] = None
+    approving_manager_id: Optional[int] = None
+    reporting_manager_id: Optional[int] = None
 
 
 @user_router.post("/verify-token",response_model=None)
@@ -60,14 +73,13 @@ async def create_user(request:CreateUserRequest, session:AsyncSession=Depends(ge
          return {
             "message": f"User with email {request.email} already exists."
         }
-    else:     
+    else:   
+        user_data = request.model_dump(exclude_unset=True)
         new_user = User(
-            name=request.name,
-            email=request.email,
-            password = None,
-            status = UserStatus.INVITED,
-            role = request.role
-             )
+            **user_data,
+            password=None,
+            status=UserStatus.INVITED
+        )
         session.add(new_user)
         await session.flush() 
     raw_token = secrets.token_urlsafe(32)
@@ -100,7 +112,7 @@ async def create_user(request:CreateUserRequest, session:AsyncSession=Depends(ge
 @user_router.post("/update-password",response_model=None)    
 async def update_password(
     request: UpdatePasswordRequest,
-     session:AsyncSession=Depends(get_db)
+    session:AsyncSession=Depends(get_db)
 ):
     token_hash = hashlib.sha256(request.raw_token.encode()).hexdigest()
 
@@ -184,7 +196,7 @@ async def get_all_user(session: AsyncSession=Depends(get_db)):
     }
 
 @user_router.get("/{user_id}")
-async def get_user_by_id(user_id: int, session: AsyncSession=Depends(get_db)):
+async def get_user_by_id_api(user_id: int, session: AsyncSession=Depends(get_db)):
     getquery = select(User).where(User.id == user_id)
     result = await session.execute(getquery)
     user1 = result.scalar_one_or_none()
@@ -194,3 +206,78 @@ async def get_user_by_id(user_id: int, session: AsyncSession=Depends(get_db)):
         "user": user1
     }    
     
+@user_router.put("/{user_id}")
+async def update_user(
+    user_id:int,
+    request:UpdateUserRequest,
+    session:AsyncSession = Depends(get_db),
+    current_user:User = Depends(allow_min_role(Role.ADMIN)),
+):
+
+    """
+    update a user by id
+    """
+
+    user = await get_user_by_id(user_id = user_id,session=session)
+    if not user:
+        raise NotFoundError(message=f"User with id {user_id} not found")
+
+    user_data = request.model_dump(exclude_unset=True,exclude_none=True)
+    for key,value in user_data.items():
+        setattr(user,key,value)
+    await session.commit()
+    await session.refresh(user)
+    return {
+        "success": True,
+        "message": "User updated successfully",
+        "data": user
+    }
+
+@user_router.get("/{user_id}/team")
+async def get_all_users_under_manager_api(
+    user_id:int,
+    session:AsyncSession = Depends(get_db),
+    current_user:User = Depends(allow_min_role(Role.MANAGER)),
+):
+    """
+    Get all team users under a manager
+    """
+    user = await get_user_by_id(user_id=current_user.id,session=session)
+    
+    if not user:
+        raise NotFoundError(message=f"User with id {current_user.id} not found")
+    
+   
+    team_users = await get_all_team_users_under_manager(manager_id=user.id,session=session)
+    
+    # Serialize each user to dict and handle role enum
+    team_users_data = []
+    for team_user in team_users:
+        user_dict = team_user.to_dict()
+        # Convert role enum to string value if it's an enum
+        role_value = user_dict.get("role")
+        if role_value and hasattr(role_value, "value"):
+            user_dict["role"] = role_value.value
+        team_users_data.append(user_dict)
+
+    return {
+        "success": True,
+        "message": "Team users retrieved successfully",
+        "data": team_users_data
+    }
+
+@user_router.get("/managers")
+async def get_all_managers_api(
+    session:AsyncSession = Depends(get_db),
+    current_user:User = Depends(allow_min_role(Role.EMPLOYEE)),
+):
+    """
+    Get all managers
+    """
+    managers = await get_all_managers(session=session)
+    return {
+        "success": True,
+        "message": "Managers retrieved successfully",
+        "data": managers if managers else []
+    }
+

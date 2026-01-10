@@ -164,3 +164,4 @@ async def delete_project(session:AsyncSession,project_id:int,user_id:int)->bool:
     await session.delete(project)
     await session.commit()
     return True
+

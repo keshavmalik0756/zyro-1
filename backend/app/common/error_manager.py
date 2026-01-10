@@ -1,11 +1,11 @@
-from app.core.conf import ENVIRONMENT
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
-import json
-import logging
 from uuid import uuid4
+from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from app.core.conf import ENVIRONMENT
+from app.common.logging import Logger
+from app.common.email_template import send_error_notification_email
 
 
 @dataclass
@@ -89,22 +89,41 @@ class ErrorMessageManager(MailManager):
         }
     
     async def publish_error_message(self):
-        """
-        Publish the error message to the logger.
-        In a production environment, this could publish to Redis or other channels.
-        """
+        """Publish the error message to the logger and/or email."""
         message = self.prepare_message()
+        message['timestamp'] = datetime.now().isoformat()
         
-        if self.channel == 'logger':
-            log_level = self.log_level.upper()
-            log_message = f"Error: {message.get('error', 'Unknown error')} | Type: {message.get('error_type', 'Unknown')} | URI: {message.get('uri', 'unknown')}"
-            
-            if log_level == 'CRITICAL':
-                logger.critical(log_message, extra=message)
-            elif log_level == 'ERROR':
-                logger.error(log_message, extra=message)
-            elif log_level == 'WARNING':
-                logger.warning(log_message, extra=message)
-            else:
-                logger.info(log_message, extra=message)
-        # For 'mail' channel, you would implement email sending here  
+        self._log_error(message)
+        
+        if self._should_send_email():
+            send_error_notification_email(message)
+    
+    def _log_error(self, message: dict):
+        """Log the error with appropriate log level."""
+        log_extra = self._prepare_log_extra(message)
+        log_level = self.log_level.upper()
+        log_message = f"Error: {message.get('error', 'Unknown error')} | Type: {message.get('error_type', 'Unknown')} | URI: {message.get('uri', 'unknown')}"
+        
+        log_methods = {
+            'CRITICAL': Logger.critical,
+            'ERROR': Logger.error,
+            'WARNING': Logger.warning,
+            'INFO': Logger.info
+        }
+        log_methods.get(log_level, Logger.error)(log_message, extra=log_extra)
+    
+    def _prepare_log_extra(self, message: dict) -> dict:
+        """Prepare log extra dict, avoiding reserved LogRecord fields."""
+        log_extra = {k: v for k, v in message.items() if k != 'module'}
+        log_extra['error_module'] = message.get('module', 'unknown')
+        return log_extra
+    
+    def _should_send_email(self) -> bool:
+        """Check if email should be sent based on channel and log level."""
+        log_level = self.log_level.upper()
+        should_send = self.channel == 'mail' and log_level in ['ERROR', 'CRITICAL']
+        
+        if not should_send:
+            Logger.warning(f"Email not sent - channel: {self.channel}, log_level: {log_level} (required: ERROR or CRITICAL)")
+        
+        return should_send  

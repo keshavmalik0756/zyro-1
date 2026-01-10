@@ -89,7 +89,14 @@ export const userApi = {
   },
 
   // POST create/invite user
-  createUser: async (userData: { name: string; email: string; role: string; organization_id: number }) => {
+  createUser: async (userData: { 
+    name: string; 
+    email: string; 
+    role: string; 
+    organization_id: number;
+    approving_manager_id?: number;
+    reporting_manager_id?: number;
+  }) => {
     try {
       const response = await apiClient.post<{ message: string; user_id: number; invite_token?: string }>('/user/create', userData);
       return response.data;
@@ -100,7 +107,15 @@ export const userApi = {
   },
 
   // PUT update user
-  updateUser: async (id: number, userData: { name?: string; email?: string; role?: string; organization_id?: number; status?: string }) => {
+  updateUser: async (id: number, userData: { 
+    name?: string; 
+    email?: string; 
+    role?: string; 
+    organization_id?: number; 
+    status?: string;
+    approving_manager_id?: number | null;
+    reporting_manager_id?: number | null;
+  }) => {
     try {
       const response = await apiClient.put<{ success: boolean; message: string; data: any }>(`/user/${id}`, userData);
       return response.data.data;
@@ -158,5 +173,16 @@ export const userApi = {
       { refresh_token: refreshToken }
     );
     return res.data.data.access_token;
+  },
+
+  // GET all users under manager
+  getTeamUsers: async (userId: number): Promise<User[]> => {
+    try {
+      const response = await apiClient.get<ApiResponse<User[]>>(`/user/${userId}/team`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error(`Error fetching team users for user ${userId}:`, error);
+      throw error;
+    }
   },
 };

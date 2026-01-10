@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, WebSocket
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import OperationalError, DisconnectionError
@@ -10,6 +10,7 @@ from app.models.model import User
 from app.common.errors import CredentialError,PermissionDeniedError,DatabaseErrors
 from app.core.enums import Role
 from typing import List
+from fastapi import WebSocket
 
 
 security = HTTPBearer(auto_error=False)  # Set auto_error to False to handle missing credentials manually
@@ -103,3 +104,48 @@ def allow_min_role(min_role: Role):
         return current_user
 
     return checker
+
+# ----------------------------------------------------------------------------------------------
+# WEBSOCKET AUTHENTICATION
+# ----------------------------------------------------------------------------------------------
+
+async def get_current_user_websocket(
+    websocket: WebSocket,
+    session: AsyncSession = Depends(get_db)
+) -> User:
+    """
+    Dependency to get current authenticated user from WebSocket connection
+    Reads token from query params (WebSocket doesn't support headers the same way)
+    """
+    
+    # Get token from query params
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008, reason="Authentication required")
+        raise CredentialError(message="Authentication required. Please provide a valid token.")
+    
+    try:
+        # Decode token (same logic as get_current_user)
+        payload = decode_token(token)
+        user_id = payload.get("user_id")
+        
+        if not user_id:
+            await websocket.close(code=1008, reason="Invalid token")
+            raise CredentialError(message="Invalid token: user_id not found")
+        
+        # Get user from database
+        user = await get_user_by_id(user_id=user_id, session=session)
+        
+        if not user:
+            await websocket.close(code=1008, reason="User not found")
+            raise CredentialError(message="User not found")
+        
+        return user
+    except CredentialError:
+        raise
+    except ValueError as e:
+        await websocket.close(code=1008, reason="Invalid token")
+        raise CredentialError(message=f"Invalid token: {str(e)}")
+    except Exception as e:
+        await websocket.close(code=1011, reason="Internal server error")
+        raise CredentialError(message="Authentication failed")

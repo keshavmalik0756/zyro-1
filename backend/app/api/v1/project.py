@@ -153,3 +153,14 @@ async def delete_project_api(
         "message":"Project deleted successfully",
         "data": None
     }
+
+@project_router.get("/{project_id}/team")
+async def get_all_team_members_api(
+    project_id:int,
+    session:AsyncSession = Depends(get_db),
+    current_user:User = Depends(get_current_user),
+):
+    """
+    Get all team members of a project
+    """
+    project = await get_project_by_id(project_id=project_id,user_id=current_user.id,session=session)
