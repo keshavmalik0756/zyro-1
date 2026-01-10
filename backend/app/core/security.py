@@ -4,6 +4,8 @@ from datetime import datetime,timedelta
 from jose import jwt, JWTError
 from app.core.conf import JWT_SECRET_KEY,JWT_ACCESS_TOKEN_EXPIRE_MINUTES,JWT_ALGORITHM,JWT_REFRESH_TOKEN_EXPIRE_MINUTES
 from app.common.errors import ServerErrors
+import hmac
+import hashlib
 
 async def hash_password(password:str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'),bcrypt.gensalt(rounds=10)).decode('utf-8')
@@ -62,4 +64,25 @@ def decode_token(token: str) -> dict:
     except jwt.JWTError:
         raise ValueError("Invalid token")
 
+async def verify_github_signature(body:bytes,secret_key:str,x_hub_signature_256:bytes) -> bool:
+    """
+    Verify GitHub signature
 
+    Args:
+        body (bytes): The body of the request
+        secret_key (str): The secret key for the GitHub webhook
+
+    Returns:
+        bool: True if signature is valid, False otherwise
+    """
+    
+    signature = "sha256="+ hmac.new(
+        secret_key.encode('utf-8'),
+        body,
+        hashlib.sha256
+        
+    ).hexdigest()
+    
+    
+    return hmac.compare_digest(signature.encode('utf-8'),x_hub_signature_256)
+    

@@ -1,10 +1,11 @@
 from app.models.model import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select,or_
 from app.core.security import hash_password,verify_password
 from app.core.enums import Role,UserStatus
 from app.common.errors import NotFoundError
-from typing import Optional
+from typing import Optional,List
+
 
 
 async def get_user_by_email(email:str,session:AsyncSession) -> Optional[User]:
@@ -72,4 +73,25 @@ async def update_user_password(
     return user
 
 
+async def get_all_team_users_under_manager(manager_id:int,session:AsyncSession) -> List[User]:
+    """
+    Get all team users under a manager
+    """
+    team_users = select(User).filter(
+        or_(
+            User.reporting_manager_id == manager_id,
+            User.approving_manager_id == manager_id
+        )
+    )
+    result = await session.execute(team_users)
+    users = result.scalars().all()
+    return list(users)
     
+async def get_all_managers(session:AsyncSession) -> List[User]:
+    """
+    Get all managers
+    """
+    managers = select(User).where(User.role == Role.MANAGER)
+    result = await session.execute(managers)
+    managers = result.scalars().all()
+    return list(managers)

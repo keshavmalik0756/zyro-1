@@ -1,3 +1,4 @@
+import sqlalchemy.exc
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,6 +59,12 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(DatabaseErrors, global_exception_handler)
 app.add_exception_handler(UserErrors, global_exception_handler)
 app.add_exception_handler(ClientErrors, global_exception_handler)
+
+# Register SQLAlchemy exceptions explicitly
+app.add_exception_handler(sqlalchemy.exc.IntegrityError, global_exception_handler)
+app.add_exception_handler(sqlalchemy.exc.OperationalError, global_exception_handler)
+app.add_exception_handler(sqlalchemy.exc.ProgrammingError, global_exception_handler)
+
 # Register generic Exception handler last as fallback
 app.add_exception_handler(Exception, global_exception_handler)
 

@@ -94,20 +94,31 @@ def get_logger(name: str) -> CustomLogger:
         CustomLogger instance
     """
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)  # Set to DEBUG to see all logs
     
-    # Only add handler if it doesn't have one already
-    if not logger.handlers:
-        if IS_LOCAL:
-            # Local: log to file
-            log_file = LOGS_DIR / "app.log"
-            ch = logging.FileHandler(filename=str(log_file), encoding='utf-8')
-        else:
-            # Production: log to stdout
-            ch = logging.StreamHandler(stream=sys.stdout)
-        
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
+    # Remove existing handlers to avoid duplicates
+    if logger.handlers:
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+    
+    # Always add both file and console handlers for better visibility
+    # File handler
+    log_file = LOGS_DIR / "app.log"
+    file_handler = logging.FileHandler(filename=str(log_file), encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler (always add for terminal visibility)
+    console_handler = logging.StreamHandler(stream=sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+    # Simpler formatter for console
+    console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
+    
+    # Prevent propagation to root logger
+    logger.propagate = False
     
     return logger
 

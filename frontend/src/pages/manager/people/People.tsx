@@ -248,7 +248,14 @@ const People = () => {
   }, [users, searchQuery, roleFilter, statusFilter]);
 
   // Handle create
-  const handleCreate = async (userData: { name: string; email: string; role: string; organization_id: number }) => {
+  const handleCreate = async (userData: { 
+    name: string; 
+    email: string; 
+    role: string; 
+    organization_id: number;
+    approving_manager_id?: number;
+    reporting_manager_id?: number;
+  }) => {
     try {
       await userApi.createUser(userData);
       toast.success("User invited successfully!");

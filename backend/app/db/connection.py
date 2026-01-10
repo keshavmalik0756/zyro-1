@@ -5,7 +5,7 @@ from app.core.conf import DATABASE_URL, DEBUG
 # Create async engine
 engine = create_async_engine(
     DATABASE_URL,
-    echo=DEBUG,            # Enable SQL logging in debug mode
+    echo=False,            # Enable SQL logging in debug mode
     future=True,
     pool_size=5,           # max persistent connections (reduced to prevent connection exhaustion)
     max_overflow=5,        # allow temporary burst (reduced to prevent connection exhaustion)

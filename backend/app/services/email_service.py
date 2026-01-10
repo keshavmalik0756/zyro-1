@@ -12,11 +12,17 @@ from app.core.conf import EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PA
 #     def send_email(self, subject:str,body:str)
 
 def send_email(subject:str,body:str,to_email:list[str]):
+    # Filter out empty strings and validate email addresses
+    valid_emails = [email.strip() for email in to_email if email and email.strip() and '@' in email.strip()]
+    
+    if not valid_emails:
+        raise ValueError("No valid email recipients provided")
+    
     msg = EmailMessage()
     msg.set_content(body)
     msg["Subject"] = subject
     msg["From"] = EMAIL_HOST_USER
-    msg["To"] = ", ".join(to_email)
+    msg["To"] = ", ".join(valid_emails)
     msg.add_alternative(body, subtype="html")
 
     with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:

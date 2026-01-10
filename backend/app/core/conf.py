@@ -59,3 +59,27 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND")
+
+# Cloudinary Settings
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+CLOUDINARY_SECURE = os.getenv("CLOUDINARY_SECURE")
+
+# Logging Settings
+IS_LOCAL = os.getenv("IS_LOCAL", "False").lower() == "true"
+
+# Redis Settings
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
+
+# Error Notification Settings
+ERROR_NOTIFICATION_EMAILS = os.getenv("ERROR_NOTIFICATION_EMAILS", "").split(",") if os.getenv("ERROR_NOTIFICATION_EMAILS") else []
+ERROR_NOTIFICATION_EMAILS = [email.strip() for email in ERROR_NOTIFICATION_EMAILS if email.strip()]
+ENABLE_ERROR_EMAILS = os.getenv("ENABLE_ERROR_EMAILS", "True").lower() == "true"
+
+# GitHub Settings
+GITHUB_SECRET_KEY = os.getenv("GITHUB_SECRET_KEY")
+ 
