@@ -54,7 +54,7 @@ async def get_sprint_by_id_api(
     session:AsyncSession = Depends(get_db),
 ):
     """
-    Get a sprint by id
+    Get a sprint by id with issues
     """
     sprint = await get_sprint_by_id(sprint_id,session)
     if not sprint:

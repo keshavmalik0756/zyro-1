@@ -6,7 +6,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+from sqlalchemy import event
 from decimal import Decimal
+from app.utils.model_utils import generate_log_id
 
 from app.core.enums import (
     Role, UserStatus,
@@ -36,6 +38,10 @@ class User(Base, TimestampMixin):
     password = Column(String, nullable=True)
     role = Column(Enum(Role, values_callable=lambda enum: [e.value for e in enum]), nullable=False)
     story_point = Column(Integer, default=0)
+    approving_manager_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    reporting_manager_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    approving_manager = relationship("User", foreign_keys=[approving_manager_id], lazy="selectin")
+    reporting_manager = relationship("User", foreign_keys=[reporting_manager_id], lazy="selectin")
 
     status = Column(Enum(UserStatus,values_callable=lambda enum: [e.value for e in enum]), default=UserStatus.ACTIVE, nullable=False)
     def to_dict(self):
@@ -222,7 +228,8 @@ class Issue(Base, TimestampMixin):
         back_populates="parent_issue",
         cascade="all, delete"
     )
-
+    
+    time_estimate = Column(Numeric, default=None, nullable=False)
 
 # ================= WORK LOGS =================
 
@@ -231,7 +238,7 @@ class Logs(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    task_id = Column(Integer, ForeignKey(Issue.id), nullable=False)
+    issue_id = Column(Integer, ForeignKey(Issue.id), nullable=False)
     log_id = Column(String, nullable=False)
 
     date = Column(Date, nullable=False)
@@ -240,6 +247,13 @@ class Logs(Base, TimestampMixin):
     description = Column(String)
 
     issue = relationship("Issue", back_populates="logs")
+    
+    # automatically generate logs id before insert like LOG-221
+@event.listens_for(Logs, "before_insert")
+def set_log_id(mapper, connection, target):
+    if not target.log_id:
+        target.log_id = generate_log_id()
+
 
 
 class Invite_Tokens(Base, TimestampMixin):

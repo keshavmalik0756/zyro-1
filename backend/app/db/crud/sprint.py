@@ -7,6 +7,8 @@ from app.core.enums import SprintStatus
 from app.models.model import ProjectMember
 from app.common.errors import NotFoundError
 
+
+
 async def get_all_active_sprints(user_id:int,session:AsyncSession) -> List[Sprint]:
     """
     Get all active sprints of user
@@ -28,17 +30,17 @@ async def get_all_active_sprints(user_id:int,session:AsyncSession) -> List[Sprin
 async def get_all_sprints(user_id:int,session:AsyncSession) -> List[Sprint]:
     """
     Get all sprints from the db for the current user
-    """
-    project_ids = select(ProjectMember.project_id).where(
-        ProjectMember.user_id == user_id
-    )
     
-    # Get all sprints for those projects with relationships loaded
-    stmt = select(Sprint).where(
-        Sprint.project_id.in_(project_ids)
-    ).options(
-        selectinload(Sprint.project),
-        selectinload(Sprint.issues)
+    selectinload: Loads related data in separate queries efficiently using in (2 queries total)
+    joinedload: Loads everything in one big join query (1 query total)
+    """
+    stmt = (select(Sprint)
+        .join(ProjectMember,ProjectMember.project_id == Sprint.project_id)
+        .where(ProjectMember.user_id == user_id)
+        .options(
+            selectinload(Sprint.project),
+            selectinload(Sprint.issues)
+        )
     )
     
     result = await session.execute(stmt)
@@ -47,9 +49,12 @@ async def get_all_sprints(user_id:int,session:AsyncSession) -> List[Sprint]:
 
 async def get_sprint_by_id(sprint_id:int,session:AsyncSession) -> Sprint:
     """
-    Get a sprint by id
+    Get a sprint by id with relationships loaded
     """
-    stmt = select(Sprint).where(Sprint.id == sprint_id)
+    stmt = select(Sprint).where(Sprint.id == sprint_id).options(
+        selectinload(Sprint.project),
+        selectinload(Sprint.issues)
+    )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -57,7 +62,9 @@ async def create_sprint(session:AsyncSession,payload:dict) -> Sprint:
     """
     Create a new sprint
     """
-    sprint_id = f"SPRINT-{select(func.max(Sprint.id)) + 1}"
+    max_sprint_id = await session.scalar(select(func.max(Sprint.id)))
+    next_sprint_id = (max_sprint_id or 0) + 1
+    sprint_id = f"SPRINT-{next_sprint_id}"
     sprint = Sprint(**payload,sprint_id=sprint_id)
     session.add(sprint)
     await session.commit()
